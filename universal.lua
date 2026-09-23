@@ -1,4 +1,4 @@
--- NOVA v6.2 SINGLE FILE | ESP / Aimbot / Misc (South Bronx auto-detect)
+-- NOVA v6.3 SINGLE FILE | ESP / Aimbot / Misc (South Bronx auto-detect)
 -- Menu: RightShift (drag via welcome header) • Panic default: Delete
 
 local Players = game:GetService("Players")
@@ -10,7 +10,7 @@ local TeleportService = game:GetService("TeleportService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local LocalPlayer = Players.LocalPlayer
 
-print("[NOVA] v6.2 boot (single file)")
+print("[NOVA] v6.3 boot (single file)")
 
 -- KEY SYSTEM: set true + put your keys in VALID_KEYS to lock the script
 local KeySystemEnabled = false
@@ -28,7 +28,7 @@ local IS_SOUTH_BRONX = (detectedUniverse == SOUTH_BRONX_UNIVERSE) or (SOUTH_BRON
 local GAME_VERSION = IS_SOUTH_BRONX and "South Bronx" or "Universal"
 local FILE_TAG = "single"
 
-print("[NOVA] v6.2 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
+print("[NOVA] v6.3 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
 
 local THEME = {
     BG = Color3.fromRGB(16,16,22),
@@ -255,7 +255,7 @@ pct.BackgroundTransparency=1 pct.Text="0%" pct.Font=Enum.Font.GothamBold
 pct.TextSize=12 pct.TextColor3=Color3.new(1,1,1) pct.Parent=loading
 local loadVer=Instance.new("TextLabel")
 loadVer.Size=UDim2.new(1,0,0,16) loadVer.Position=UDim2.new(0,0,0,164)
-loadVer.BackgroundTransparency=1 loadVer.Text="v6.2 ("..FILE_TAG..")"
+loadVer.BackgroundTransparency=1 loadVer.Text="v6.3 ("..FILE_TAG..")"
 loadVer.Font=Enum.Font.Gotham loadVer.TextSize=11 loadVer.TextColor3=THEME.TextDim loadVer.Parent=loading
 task.spawn(function()
     local ok, info = pcall(function() return MarketplaceService:GetProductInfo(detectedPlace) end)
@@ -293,7 +293,7 @@ w2.BackgroundTransparency=1 w2.Text="NOVA" w2.Font=Enum.Font.GothamBold
 w2.TextSize=24 w2.TextColor3=Color3.new(1,1,1) w2.TextXAlignment=Enum.TextXAlignment.Left w2.Parent=head
 local w3=Instance.new("TextLabel")
 w3.Size=UDim2.new(1,-14,0,16) w3.Position=UDim2.new(0,7,0,56)
-w3.BackgroundTransparency=1 w3.Text="V 6.2 • "..GAME_VERSION w3.Font=Enum.Font.Gotham
+w3.BackgroundTransparency=1 w3.Text="V 6.3 • "..GAME_VERSION w3.Font=Enum.Font.Gotham
 w3.TextSize=12 w3.TextColor3=THEME.TextDim w3.TextXAlignment=Enum.TextXAlignment.Left w3.Parent=head
 local headLine=Instance.new("Frame")
 headLine.Size=UDim2.new(1,-14,0,2) headLine.Position=UDim2.new(0,7,0,78)
@@ -734,7 +734,7 @@ local mo=1
 pageHeader(miscPage,mo,"Misc") mo=mo+1
 local statLbl=Instance.new("TextLabel")
 statLbl.LayoutOrder=mo mo=mo+1 statLbl.Size=UDim2.new(1,-4,0,20) statLbl.BackgroundTransparency=1
-statLbl.Text="NOVA v6.2 • "..GAME_VERSION statLbl.Font=Enum.Font.GothamBold
+statLbl.Text="NOVA v6.3 • "..GAME_VERSION statLbl.Font=Enum.Font.GothamBold
 statLbl.TextSize=13 statLbl.TextColor3=Color3.new(1,1,1) statLbl.TextXAlignment=Enum.TextXAlignment.Left statLbl.Parent=miscPage
 local perfLbl=Instance.new("TextLabel")
 perfLbl.LayoutOrder=mo mo=mo+1 perfLbl.Size=UDim2.new(1,-4,0,18) perfLbl.BackgroundTransparency=1
@@ -980,15 +980,15 @@ local function getAimPos(parts,cam,mousePos)
     else
         local best,bestD=nil,math.huge
         if parts.Head then
-            local sp,ok=cam:WorldToScreenPoint(parts.Head.Position)
+            local sp,ok=cam:WorldToViewportPoint(parts.Head.Position)
             if ok then local d=screenDist(sp.X,sp.Y,mousePos.X,mousePos.Y) if d<bestD then bestD=d best=parts.Head.Position end end
         end
         if parts.HRP then
-            local sp,ok=cam:WorldToScreenPoint(parts.HRP.Position)
+            local sp,ok=cam:WorldToViewportPoint(parts.HRP.Position)
             if ok then local d=screenDist(sp.X,sp.Y,mousePos.X,mousePos.Y) if d<bestD then bestD=d best=parts.HRP.Position end end
         end
         if parts.Upper then
-            local sp,ok=cam:WorldToScreenPoint(parts.Upper.Position)
+            local sp,ok=cam:WorldToViewportPoint(parts.Upper.Position)
             if ok then local d=screenDist(sp.X,sp.Y,mousePos.X,mousePos.Y) if d<bestD then bestD=d best=parts.Upper.Position end end
         end
         return best
@@ -1008,7 +1008,7 @@ local function findTarget(cam,mousePos,myHrp)
                 if dx*dx+dy*dy+dz*dz <= maxD2 then
                     local wp=getAimPos(d.parts,cam,mousePos)
                     if wp then
-                        local sp,ok=cam:WorldToScreenPoint(wp)
+                        local sp,ok=cam:WorldToViewportPoint(wp)
                         if ok then
                             local sd=screenDist(sp.X,sp.Y,mousePos.X,mousePos.Y)
                             if sd<=Settings.FOV then
@@ -1058,7 +1058,11 @@ renderConn=track(RunService.RenderStepped:Connect(function()
     local doLabels=(frameCount%10==0)
     local doOverlay=(frameCount%2==0)
     local cam=Workspace.CurrentCamera if not cam then return end
-    local mousePos=UserInputService:GetMouseLocation()
+    local mouseRaw=UserInputService:GetMouseLocation()
+    local vpsz=cam.ViewportSize
+    local asz=overlayGui.AbsoluteSize
+    local offX=asz.X-vpsz.X local offY=asz.Y-vpsz.Y
+    local mousePos=Vector2.new(mouseRaw.X-offX, mouseRaw.Y-offY)
     local col=Settings.Color
     local espOn=Settings.ESPEnabled
     local boxesOn=Settings.Boxes
@@ -1069,7 +1073,7 @@ renderConn=track(RunService.RenderStepped:Connect(function()
             lastFOV=Settings.FOV
             fovCircle.Size=UDim2.new(0,Settings.FOV*2,0,Settings.FOV*2)
         end
-        fovCircle.Position=UDim2.new(0,mousePos.X,0,mousePos.Y)
+        fovCircle.Position=UDim2.new(0,mouseRaw.X,0,mouseRaw.Y)
     else fovCircle.Visible=false end
     local myChar=LocalPlayer.Character
     local myHrp=myChar and myChar:FindFirstChild("HumanoidRootPart")
@@ -1106,8 +1110,8 @@ renderConn=track(RunService.RenderStepped:Connect(function()
                         hideOverlay(d)
                     elseif doOverlay then
                         if Settings.Tracers and scrW>0 then
-                            local sp,ok=cam:WorldToScreenPoint(hrp.Position)
-                            if ok then drawLine(d.tracer, scrW*0.5, scrH, sp.X, sp.Y, col)
+                            local sp,ok=cam:WorldToViewportPoint(hrp.Position)
+                            if ok then drawLine(d.tracer, scrW*0.5, scrH, sp.X+offX, sp.Y+offY, col)
                             else d.tracer.Visible=false end
                         elseif d.tracer then d.tracer.Visible=false end
                     end
@@ -1127,7 +1131,7 @@ renderConn=track(RunService.RenderStepped:Connect(function()
     if Settings.Trigger and nowC-lastTrig>0.12 then
         lastTrig=nowC
         if canClick and myHrp then
-            local ray=cam:ScreenPointToRay(mousePos.X, mousePos.Y)
+            local ray=cam:ViewportPointToRay(mousePos.X, mousePos.Y)
             if ray then
                 rayParams.FilterDescendantsInstances={LocalPlayer.Character, cam}
                 local res=Workspace:Raycast(ray.Origin, ray.Direction*1000, rayParams)
@@ -1162,7 +1166,7 @@ renderConn=track(RunService.RenderStepped:Connect(function()
         if bestPos then
             if Settings.AimMethod=="Snap" then cam.CFrame=CFrame.new(cam.CFrame.Position,bestPos)
             elseif Settings.AimMethod=="Mouse" and hasMouseMove then
-                local sp,_=cam:WorldToScreenPoint(bestPos)
+                local sp,_=cam:WorldToViewportPoint(bestPos)
                 local s=math.max(1,Settings.Smoothing)
                 pcall(function() mousemoverel((sp.X-mousePos.X)/s,(sp.Y-mousePos.Y)/s) end)
             else
@@ -1191,7 +1195,7 @@ end))
 local function finishLoading()
     if Unloaded or LoadingDone or not gateOpen() then return end
     LoadingDone=true
-    print("[NOVA] v6.2 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
+    print("[NOVA] v6.3 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
     pcall(function() loading:Destroy() end)
     pcall(function() main.Visible=true end)
     for _,p in ipairs(Players:GetPlayers()) do
