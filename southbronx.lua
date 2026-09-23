@@ -1,4 +1,4 @@
--- NOVA v6.6 SOUTH BRONX FILE | ESP / Aimbot / Misc (South Bronx: The Trenches)
+-- NOVA v6.7 SOUTH BRONX FILE | ESP / Aimbot / Misc (South Bronx: The Trenches)
 -- Menu: RightShift (drag via welcome header) • Panic default: Delete
 
 local Players = game:GetService("Players")
@@ -11,7 +11,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = Players.LocalPlayer
 
-print("[NOVA] v6.6 boot (southbronx file)")
+print("[NOVA] v6.7 boot (southbronx file)")
 
 -- KEY SYSTEM: set true + put your keys in VALID_KEYS to lock the script
 local KeySystemEnabled = false
@@ -27,7 +27,7 @@ local detectedUniverse, detectedPlace = 0, 0
 pcall(function() detectedUniverse = game.GameId end)
 pcall(function() detectedPlace = game.PlaceId end)
 
-print("[NOVA] v6.6 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
+print("[NOVA] v6.7 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
 
 local THEME = {
     BG = Color3.fromRGB(16,16,22),
@@ -40,7 +40,7 @@ local THEME = {
 
 local Settings = {
     ESPEnabled = true, Boxes = true, Names = true, Distance = true,
-    TeamCheck = false, MaxESP = 2000,
+    TeamCheck = false, MaxESP = 2000, OverlayY = 0,
     Tracers = false, Inventory = false,
     Color = Color3.fromRGB(255,0,0),
     AimEnabled = false, AimMethod = "Camera", AimMode = "Hold",
@@ -278,7 +278,7 @@ pct.BackgroundTransparency=1 pct.Text="0%" pct.Font=Enum.Font.GothamBold
 pct.TextSize=12 pct.TextColor3=Color3.new(1,1,1) pct.Parent=loading
 local loadVer=Instance.new("TextLabel")
 loadVer.Size=UDim2.new(1,0,0,16) loadVer.Position=UDim2.new(0,0,0,164)
-loadVer.BackgroundTransparency=1 loadVer.Text="v6.6 ("..FILE_TAG..")"
+loadVer.BackgroundTransparency=1 loadVer.Text="v6.7 ("..FILE_TAG..")"
 loadVer.Font=Enum.Font.Gotham loadVer.TextSize=11 loadVer.TextColor3=THEME.TextDim loadVer.Parent=loading
 task.spawn(function()
     local ok, info = pcall(function() return MarketplaceService:GetProductInfo(detectedPlace) end)
@@ -316,7 +316,7 @@ w2.BackgroundTransparency=1 w2.Text="NOVA" w2.Font=Enum.Font.GothamBold
 w2.TextSize=24 w2.TextColor3=Color3.new(1,1,1) w2.TextXAlignment=Enum.TextXAlignment.Left w2.Parent=head
 local w3=Instance.new("TextLabel")
 w3.Size=UDim2.new(1,-14,0,16) w3.Position=UDim2.new(0,7,0,56)
-w3.BackgroundTransparency=1 w3.Text="V 6.6 • "..GAME_VERSION w3.Font=Enum.Font.Gotham
+w3.BackgroundTransparency=1 w3.Text="V 6.7 • "..GAME_VERSION w3.Font=Enum.Font.Gotham
 w3.TextSize=12 w3.TextColor3=THEME.TextDim w3.TextXAlignment=Enum.TextXAlignment.Left w3.Parent=head
 local headLine=Instance.new("Frame")
 headLine.Size=UDim2.new(1,-14,0,2) headLine.Position=UDim2.new(0,7,0,78)
@@ -605,6 +605,7 @@ do local r=newRow(espPage,o); o=o+1
 end
 createToggle(espPage,o,"Inventory","Inventory",Profile.inventoryDefault,function(v) Settings.Inventory=v end) o=o+1
 createSlider(espPage,o,"MaxESP","Max ESP Dist",100,5000,Settings.MaxESP,function(v) Settings.MaxESP=v end) o=o+1
+createSlider(espPage,o,"OverlayY","Overlay Y-Shift",-100,100,Settings.OverlayY,function(v) Settings.OverlayY=v end) o=o+1
 
 do
     local boxH=Instance.new("TextLabel")
@@ -758,7 +759,7 @@ local mo=1
 pageHeader(miscPage,mo,"Misc") mo=mo+1
 local statLbl=Instance.new("TextLabel")
 statLbl.LayoutOrder=mo mo=mo+1 statLbl.Size=UDim2.new(1,-4,0,20) statLbl.BackgroundTransparency=1
-statLbl.Text="NOVA v6.6 • "..GAME_VERSION statLbl.Font=Enum.Font.GothamBold
+statLbl.Text="NOVA v6.7 • "..GAME_VERSION statLbl.Font=Enum.Font.GothamBold
 statLbl.TextSize=13 statLbl.TextColor3=Color3.new(1,1,1) statLbl.TextXAlignment=Enum.TextXAlignment.Left statLbl.Parent=miscPage
 local perfLbl=Instance.new("TextLabel")
 perfLbl.LayoutOrder=mo mo=mo+1 perfLbl.Size=UDim2.new(1,-4,0,18) perfLbl.BackgroundTransparency=1
@@ -836,7 +837,7 @@ function saveConfig()
     local data={
         ESPEnabled=Settings.ESPEnabled, Boxes=Settings.Boxes, Names=Settings.Names,
         Distance=Settings.Distance, TeamCheck=Settings.TeamCheck,
-        MaxESP=Settings.MaxESP, Tracers=Settings.Tracers, Inventory=Settings.Inventory,
+        MaxESP=Settings.MaxESP, OverlayY=Settings.OverlayY, Tracers=Settings.Tracers, Inventory=Settings.Inventory,
         Color={math.floor(c.R*255+0.5), math.floor(c.G*255+0.5), math.floor(c.B*255+0.5)},
         AimEnabled=Settings.AimEnabled, AimMethod=Settings.AimMethod, AimMode=Settings.AimMode,
         FOV=Settings.FOV, ShowFOV=Settings.ShowFOV, Smoothing=Settings.Smoothing,
@@ -860,7 +861,7 @@ function loadConfig()
         local fn=UIHandles[id]
         if fn and v~=nil then pcall(fn, v) end
     end
-    for _, id in ipairs({"ESPEnabled","Boxes","Names","Distance","TeamCheck","MaxESP","Inventory","Tracers",
+    for _, id in ipairs({"ESPEnabled","Boxes","Names","Distance","TeamCheck","MaxESP","OverlayY","Inventory","Tracers",
         "AimEnabled","AimMethod","AimMode","FOV","ShowFOV","Smoothing","Target","Priority",
         "AimTeamCheck","WallCheck","NoKnock","Trigger","AFKProtect","MaxDistance"}) do
         apply(id, data[id])
@@ -1019,28 +1020,32 @@ local function hideOverlay(d)
 end
 
 local function updateBox2D(d, cam, col, myHrp, hrp, showBox, showName)
-    local cxw=hrp.Position+Vector3.new(0,0.4,0)
-    local sp, ok = cam:WorldToViewportPoint(cxw)
-    if not ok then hideOverlay(d) return end
-    local vph=cam.ViewportSize.Y
-    if not vph or vph<=0 then hideOverlay(d) return end
-    local dist = myHrp and (myHrp.Position-hrp.Position).Magnitude or 60
-    if dist<1 then dist=1 end
-    local fovr=math.rad(math.clamp(cam.FieldOfView,1,120)/2)
-    local tn=math.tan(fovr)
-    if tn<=0.001 then hideOverlay(d) return end
-    local boxH=math.clamp(6.5*vph/(2*dist*tn),10,600)
-    local boxW=boxH*0.6
+    -- anchored to projected head-top + feet: exact on screen at ANY distance,
+    -- no FOV/size math that can oversize. OverlayY calibrates client offset.
+    local head=d.parts.Head
+    if not head or head.Parent==nil then hideOverlay(d) return end
+    local pTop, okT = cam:WorldToViewportPoint(head.Position+Vector3.new(0,0.7,0))
+    local pBot, okB = cam:WorldToViewportPoint(hrp.Position-Vector3.new(0,3.0,0))
+    if not okT or not okB then hideOverlay(d) return end
     local asz=overlayGui.AbsoluteSize
     local vpsz=cam.ViewportSize
-    local cx, cy = sp.X+(asz.X-vpsz.X), sp.Y+(asz.Y-vpsz.Y)
+    local ox=(asz.X-vpsz.X)
+    local oy=(asz.Y-vpsz.Y)+Settings.OverlayY
+    local topX, topY = pTop.X+ox, pTop.Y+oy
+    local botX, botY = pBot.X+ox, pBot.Y+oy
+    local boxH=botY-topY
+    if boxH<12 then hideOverlay(d) return end
+    if boxH>800 then boxH=800 end
+    local boxW=boxH*0.6
+    local cx=(topX+botX)/2
+    local top=botY-boxH
     d.box.Size=UDim2.new(0,boxW,0,boxH)
-    d.box.Position=UDim2.new(0,cx-boxW/2,0,cy-boxH/2)
+    d.box.Position=UDim2.new(0,cx-boxW/2,0,top)
     d.box.Visible=showBox
-    d.name.Position=UDim2.new(0,cx,0,cy-boxH/2-52)
+    d.name.Position=UDim2.new(0,cx,0,top-52)
     d.name.Visible=showName
     d.hpbg.Size=UDim2.new(0,4,0,boxH)
-    d.hpbg.Position=UDim2.new(0,cx-boxW/2-7,0,cy-boxH/2)
+    d.hpbg.Position=UDim2.new(0,cx-boxW/2-7,0,top)
     d.hpbg.Visible=showBox
 end
 
@@ -1227,7 +1232,7 @@ renderConn=track(RunService.RenderStepped:Connect(function()
                         updateBox2D(d, cam, col, myHrp, hrp, showBox, showName)
                         if show and Settings.Tracers and scrW>0 then
                             local sp,ok=cam:WorldToViewportPoint(hrp.Position)
-                            if ok then drawLine(d.tracer, scrW*0.5, scrH, sp.X+offX, sp.Y+offY, col)
+                            if ok then drawLine(d.tracer, scrW*0.5, scrH, sp.X+offX, sp.Y+offY+Settings.OverlayY, col)
                             else d.tracer.Visible=false end
                         elseif d.tracer then d.tracer.Visible=false end
                     end
@@ -1311,7 +1316,7 @@ end))
 local function finishLoading()
     if Unloaded or LoadingDone or not gateOpen() then return end
     LoadingDone=true
-    print("[NOVA] v6.6 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
+    print("[NOVA] v6.7 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
     pcall(function() loading:Destroy() end)
     pcall(function() main.Visible=true end)
     for _,p in ipairs(Players:GetPlayers()) do
