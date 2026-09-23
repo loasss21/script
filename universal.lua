@@ -42,7 +42,7 @@ local THEME = {
 local Settings = {
     ESPEnabled = true, Boxes = true, Names = true, Distance = true,
     TeamCheck = false, MaxESP = 2000,
-    Tracers = false, HeadDot = false,
+    Tracers = false,
     Color = Color3.fromRGB(255,0,0),
     AimEnabled = false, AimMethod = "Camera", AimMode = "Hold",
     AimKey = {Type="Mouse", Button=Enum.UserInputType.MouseButton2, Name="RMB"},
@@ -580,9 +580,6 @@ do local r=newRow(espPage,o); o=o+1
     createToggle(r,1,"TeamCheck","Team Check",false,function(v) Settings.TeamCheck=v end,0.5,-3)
     createToggle(r,2,"Tracers","Tracers",false,function(v) Settings.Tracers=v end,0.5,-3)
 end
-do local r=newRow(espPage,o); o=o+1
-    createToggle(r,1,"HeadDot","Head Dot",false,function(v) Settings.HeadDot=v end,0.5,-3)
-end
 createSlider(espPage,o,"MaxESP","Max ESP Dist",100,5000,Settings.MaxESP,function(v) Settings.MaxESP=v end) o=o+1
 
 do
@@ -796,7 +793,7 @@ function saveConfig()
     local data={
         ESPEnabled=Settings.ESPEnabled, Boxes=Settings.Boxes, Names=Settings.Names,
         Distance=Settings.Distance, TeamCheck=Settings.TeamCheck,
-        MaxESP=Settings.MaxESP, Tracers=Settings.Tracers, HeadDot=Settings.HeadDot,
+        MaxESP=Settings.MaxESP, Tracers=Settings.Tracers,
         Color={math.floor(c.R*255+0.5), math.floor(c.G*255+0.5), math.floor(c.B*255+0.5)},
         AimEnabled=Settings.AimEnabled, AimMethod=Settings.AimMethod, AimMode=Settings.AimMode,
         FOV=Settings.FOV, ShowFOV=Settings.ShowFOV, Smoothing=Settings.Smoothing,
@@ -818,7 +815,7 @@ function loadConfig()
         local fn=UIHandles[id]
         if fn and v~=nil then pcall(fn, v) end
     end
-    for _, id in ipairs({"ESPEnabled","Boxes","Names","Distance","TeamCheck","MaxESP","Tracers","HeadDot",
+    for _, id in ipairs({"ESPEnabled","Boxes","Names","Distance","TeamCheck","MaxESP","Tracers",
         "AimEnabled","AimMethod","AimMode","FOV","ShowFOV","Smoothing","Target","Priority",
         "AimTeamCheck","WallCheck","NoKnock","Trigger","MaxDistance"}) do
         apply(id, data[id])
@@ -839,7 +836,6 @@ local function clearESP(player)
     if d then
         pcall(function() d.boxGui:Destroy() end) pcall(function() d.nameGui:Destroy() end)
         pcall(function() if d.tracer then d.tracer:Destroy() end end)
-        pcall(function() if d.headdot then d.headdot:Destroy() end end)
         ESPData[player]=nil
     end
     lastAttempt[player]=nil
@@ -918,12 +914,7 @@ local function createESP(player)
     local tracer=Instance.new("Frame")
     tracer.AnchorPoint=Vector2.new(0.5,0.5) tracer.BorderSizePixel=0 tracer.Active=false
     tracer.BackgroundColor3=Settings.Color tracer.Visible=false tracer.Parent=overlayGui
-    local headdot=Instance.new("Frame")
-    headdot.AnchorPoint=Vector2.new(0.5,0.5) headdot.Size=UDim2.new(0,6,0,6)
-    headdot.BackgroundColor3=Settings.Color headdot.BorderSizePixel=0 headdot.Active=false
-    headdot.Visible=false headdot.Parent=overlayGui
-    local hdc=Instance.new("UICorner") hdc.CornerRadius=UDim.new(1,0) hdc.Parent=headdot
-    ESPData[player]={boxGui=boxGui,stroke=stroke,nameGui=nameGui,nameLabel=label,parts=parts,hrp=hrp,hum=hum,tracer=tracer,headdot=headdot}
+    ESPData[player]={boxGui=boxGui,stroke=stroke,nameGui=nameGui,nameLabel=label,parts=parts,hrp=hrp,hum=hum,tracer=tracer}
     creating[player]=nil
 end
 
@@ -947,7 +938,6 @@ end
 local function hideOverlay(d)
     if not d then return end
     if d.tracer then d.tracer.Visible=false end
-    if d.headdot then d.headdot.Visible=false end
 end
 
 local rayParams=RaycastParams.new() rayParams.FilterType=Enum.RaycastFilterType.Exclude rayParams.IgnoreWater=true
@@ -1120,14 +1110,6 @@ renderConn=track(RunService.RenderStepped:Connect(function()
                             if ok then drawLine(d.tracer, scrW*0.5, scrH, sp.X, sp.Y, col)
                             else d.tracer.Visible=false end
                         elseif d.tracer then d.tracer.Visible=false end
-                        if Settings.HeadDot and d.parts.Head and d.parts.Head.Parent~=nil then
-                            local sp,ok=cam:WorldToScreenPoint(d.parts.Head.Position)
-                            if ok then
-                                d.headdot.Visible=true
-                                if d.headdot.BackgroundColor3~=col then d.headdot.BackgroundColor3=col end
-                                d.headdot.Position=UDim2.new(0,sp.X,0,sp.Y)
-                            else d.headdot.Visible=false end
-                        elseif d.headdot then d.headdot.Visible=false end
                     end
                 end)
                 if not okP then tryCreate(player) end

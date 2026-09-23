@@ -11,6 +11,8 @@ local UNI_URL = "https://raw.githubusercontent.com/loasss21/script/main/universa
 local isSB = false
 pcall(function() isSB = game.GameId == SB_UNIVERSE end)
 print("[NOVA] loader | southbronx=" .. tostring(isSB))
+print("[NOVA] loader | thinking...")
+task.wait(3)
 
 local url = isSB and SB_URL or UNI_URL
 local ok, src = pcall(function() return game:HttpGet(url) end)
