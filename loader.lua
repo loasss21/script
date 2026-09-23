@@ -1,4 +1,4 @@
--- NOVA loader v6.8: pick a mode, it pulls the right file for the game.
+-- NOVA loader v6.9: pick a mode, it pulls the right file for the game.
 -- Needs ONE of: game:HttpGet, game:HttpGetAsync, request/syn.request/http_request.
 -- If none exist, run nova.lua directly instead.
 

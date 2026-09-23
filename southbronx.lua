@@ -1,4 +1,4 @@
--- NOVA v6.8 SOUTH BRONX FILE | ESP / Aimbot / Misc / Farm (South Bronx: The Trenches)
+-- NOVA v6.9 SOUTH BRONX FILE | ESP / Aimbot / Misc / Farm (South Bronx: The Trenches)
 -- Menu: RightShift (drag via welcome header) • Panic default: Delete
 
 local Players = game:GetService("Players")
@@ -12,7 +12,7 @@ local VirtualUser = game:GetService("VirtualUser")
 local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
-print("[NOVA] v6.8 boot (southbronx file)")
+print("[NOVA] v6.9 boot (southbronx file)")
 
 -- KEY SYSTEM: set true + put your keys in VALID_KEYS to lock the script
 local KeySystemEnabled = false
@@ -20,15 +20,17 @@ local VALID_KEYS = { ["CHANGE-ME"] = true }
 local KEY_FILE = "nova_key.txt"
 local MAX_KEY_TRIES = 5
 
--- GAME FILE: South Bronx build (hardcoded, no detection needed)
-local IS_SOUTH_BRONX = true
-local GAME_VERSION = "South Bronx"
-local FILE_TAG = "southbronx"
+-- GAME DETECTION: South Bronx: The Trenches vs everything else (Universal)
+local SOUTH_BRONX_UNIVERSE = 3734304510
+local SOUTH_BRONX_PLACES = { [10179538382] = true }
 local detectedUniverse, detectedPlace = 0, 0
 pcall(function() detectedUniverse = game.GameId end)
 pcall(function() detectedPlace = game.PlaceId end)
+local IS_SOUTH_BRONX = (detectedUniverse == SOUTH_BRONX_UNIVERSE) or (SOUTH_BRONX_PLACES[detectedPlace] == true)
+local GAME_VERSION = IS_SOUTH_BRONX and "South Bronx" or "Universal"
+local FILE_TAG = "single"
 
-print("[NOVA] v6.8 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
+print("[NOVA] v6.9 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
 
 local THEME = {
     BG = Color3.fromRGB(16,16,22),
@@ -51,6 +53,7 @@ local Settings = {
     AimTeamCheck = true, WallCheck = true, NoKnock = true, Trigger = false,
     MaxDistance = 1000, AFKProtect = true,
     PanicKey = {Type="Key", Key=Enum.KeyCode.Delete, Name="Delete"},
+    MenuKey = {Type="Key", Key=Enum.KeyCode.RightShift, Name="RightShift"},
 }
 
 -- GAME PROFILE: South Bronx branch, nu nog gelijk aan Universal.
@@ -192,6 +195,47 @@ local gui = Instance.new("ScreenGui")
 gui.Name="NovaHub" gui.ResetOnSpawn=false gui.DisplayOrder=999 gui.Parent=parentGui
 pcall(function() gui:SetAttribute("nx",1) end)
 
+local notifHolder=Instance.new("Frame")
+notifHolder.Name="NovaNotifs" notifHolder.BackgroundTransparency=1 notifHolder.Active=false
+notifHolder.AnchorPoint=Vector2.new(1,0) notifHolder.Position=UDim2.new(1,-16,0,60)
+notifHolder.Size=UDim2.new(0,260,0,400) notifHolder.Parent=gui
+pcall(function() notifHolder:SetAttribute("nx",1) end)
+local notifList=Instance.new("UIListLayout")
+notifList.Padding=UDim.new(0,6) notifList.SortOrder=Enum.SortOrder.LayoutOrder
+notifList.HorizontalAlignment=Enum.HorizontalAlignment.Right notifList.Parent=notifHolder
+local function notify(title, text, ms)
+    ms = ms or 2600
+    pcall(function()
+        local n=0 local oldest=nil
+        for _,c in ipairs(notifHolder:GetChildren()) do
+            if c:IsA("Frame") then n=n+1 if not oldest then oldest=c end end
+        end
+        if n>=4 and oldest then oldest:Destroy() end
+    end)
+    local ok, f = pcall(function()
+        local fr=Instance.new("Frame")
+        fr.Size=UDim2.new(1,0,0,52) fr.BackgroundColor3=THEME.Panel
+        fr.BorderSizePixel=0 fr.Parent=notifHolder
+        local fc=Instance.new("UICorner") fc.CornerRadius=UDim.new(0,8) fc.Parent=fr
+        local fs=Instance.new("UIStroke") fs.Color=THEME.Stroke fs.Thickness=1 fs.Parent=fr
+        local accent=Instance.new("Frame")
+        accent.Size=UDim2.new(0,3,1,0) accent.BackgroundColor3=THEME.Accent
+        accent.BorderSizePixel=0 accent.Active=false accent.Parent=fr
+        local t1=Instance.new("TextLabel")
+        t1.Size=UDim2.new(1,-16,0,18) t1.Position=UDim2.new(0,12,0,6)
+        t1.BackgroundTransparency=1 t1.Text=title t1.Font=Enum.Font.GothamBold
+        t1.TextSize=13 t1.TextColor3=Color3.new(1,1,1) t1.TextXAlignment=Enum.TextXAlignment.Left t1.Parent=fr
+        local t2=Instance.new("TextLabel")
+        t2.Size=UDim2.new(1,-16,0,20) t2.Position=UDim2.new(0,12,0,26)
+        t2.BackgroundTransparency=1 t2.Text=text t2.Font=Enum.Font.Gotham
+        t2.TextSize=12 t2.TextColor3=THEME.TextDim t2.TextXAlignment=Enum.TextXAlignment.Left
+        t2.TextTruncate=Enum.TextTruncate.AtEnd t2.Parent=fr
+        return fr
+    end)
+    if not ok or not f then return end
+    task.delay(ms/1000, function() pcall(function() f:Destroy() end) end)
+end
+
 local keyFrame=nil local keyBox=nil local keyMsg=nil
 local keyTries=0
 if KeySystemEnabled and canFile then
@@ -234,6 +278,7 @@ if KeySystemEnabled and not keyPassed then
             if canFile then pcall(writefile, KEY_FILE, k) end
             pcall(function() keyFrame:Destroy() end)
             keyFrame=nil
+            notify("NOVA", "key accepted")
         else
             keyTries=keyTries+1
             keyMsg.Text="Wrong key ("..keyTries.."/"..MAX_KEY_TRIES..")"
@@ -286,7 +331,7 @@ pct.BackgroundTransparency=1 pct.Text="0%" pct.Font=Enum.Font.GothamBold
 pct.TextSize=12 pct.TextColor3=Color3.new(1,1,1) pct.Parent=loading
 local loadVer=Instance.new("TextLabel")
 loadVer.Size=UDim2.new(1,0,0,16) loadVer.Position=UDim2.new(0,0,0,164)
-loadVer.BackgroundTransparency=1 loadVer.Text="v6.8 ("..FILE_TAG..")"
+loadVer.BackgroundTransparency=1 loadVer.Text="v6.9 ("..FILE_TAG..")"
 loadVer.Font=Enum.Font.Gotham loadVer.TextSize=11 loadVer.TextColor3=THEME.TextDim loadVer.Parent=loading
 task.spawn(function()
     local ok, info = pcall(function() return MarketplaceService:GetProductInfo(detectedPlace) end)
@@ -324,7 +369,7 @@ w2.BackgroundTransparency=1 w2.Text="NOVA" w2.Font=Enum.Font.GothamBold
 w2.TextSize=24 w2.TextColor3=Color3.new(1,1,1) w2.TextXAlignment=Enum.TextXAlignment.Left w2.Parent=head
 local w3=Instance.new("TextLabel")
 w3.Size=UDim2.new(1,-14,0,16) w3.Position=UDim2.new(0,7,0,56)
-w3.BackgroundTransparency=1 w3.Text="V 6.8 • "..GAME_VERSION w3.Font=Enum.Font.Gotham
+w3.BackgroundTransparency=1 w3.Text="V 6.9 • "..GAME_VERSION w3.Font=Enum.Font.Gotham
 w3.TextSize=12 w3.TextColor3=THEME.TextDim w3.TextXAlignment=Enum.TextXAlignment.Left w3.Parent=head
 local headLine=Instance.new("Frame")
 headLine.Size=UDim2.new(1,-14,0,2) headLine.Position=UDim2.new(0,7,0,78)
@@ -1006,6 +1051,7 @@ scanBtn.MouseButton1Click:Connect(function()
     local n=0
     pcall(function() n=scanATMs() end)
     atmCountLbl.Text="ATMs found: "..n
+    notify("Farm", n.." ATMs found")
 end)
 createToggle(farmPage,fzb,nil,"Auto ATM Farm",false,function(v) SB.AutoATM=v if v then atmLoop() end end) fzb=fzb+1
 createSlider(farmPage,fzb,nil,"ATM Cooldown",4,30,SB.ATMCooldown,function(v) SB.ATMCooldown=v end) fzb=fzb+1
@@ -1072,13 +1118,14 @@ local mo=1
 pageHeader(miscPage,mo,"Misc") mo=mo+1
 local statLbl=Instance.new("TextLabel")
 statLbl.LayoutOrder=mo mo=mo+1 statLbl.Size=UDim2.new(1,-4,0,20) statLbl.BackgroundTransparency=1
-statLbl.Text="NOVA v6.8 • "..GAME_VERSION statLbl.Font=Enum.Font.GothamBold
+statLbl.Text="NOVA v6.9 • "..GAME_VERSION statLbl.Font=Enum.Font.GothamBold
 statLbl.TextSize=13 statLbl.TextColor3=Color3.new(1,1,1) statLbl.TextXAlignment=Enum.TextXAlignment.Left statLbl.Parent=miscPage
 local perfLbl=Instance.new("TextLabel")
 perfLbl.LayoutOrder=mo mo=mo+1 perfLbl.Size=UDim2.new(1,-4,0,18) perfLbl.BackgroundTransparency=1
 perfLbl.Text="FPS: -- • Players: --" perfLbl.Font=Enum.Font.Gotham
 perfLbl.TextSize=12 perfLbl.TextColor3=THEME.TextDim perfLbl.TextXAlignment=Enum.TextXAlignment.Left perfLbl.Parent=miscPage
 createKeyPicker(miscPage,mo,"PanicKey","Panic Key","Delete",function(d) Settings.PanicKey=d end) mo=mo+1
+createKeyPicker(miscPage,mo,"MenuKey","Menu Key","RightShift",function(d) Settings.MenuKey=d pcall(function() hintLbl.Text=(d.Name or "?")..": menu" end) end) mo=mo+1
 createToggle(miscPage,mo,"AFKProtect","Anti-AFK",true,function(v) Settings.AFKProtect=v end) mo=mo+1
 local cfgNameLbl=Instance.new("TextLabel")
 cfgNameLbl.LayoutOrder=mo mo=mo+1 cfgNameLbl.Size=UDim2.new(1,-4,0,16) cfgNameLbl.BackgroundTransparency=1
@@ -1157,11 +1204,12 @@ function saveConfig()
         Target=Settings.Target, Priority=Settings.Priority, AimTeamCheck=Settings.AimTeamCheck,
         WallCheck=Settings.WallCheck, NoKnock=Settings.NoKnock, Trigger=Settings.Trigger, AFKProtect=Settings.AFKProtect,
         MaxDistance=Settings.MaxDistance,
-        AimKey=keyToSave(Settings.AimKey), PanicKey=keyToSave(Settings.PanicKey),
+        AimKey=keyToSave(Settings.AimKey), PanicKey=keyToSave(Settings.PanicKey), MenuKey=keyToSave(Settings.MenuKey),
     }
     local nm=cfgCleanName(cfgNameBox and cfgNameBox.Text or "")
     local ok = pcall(function() writefile(cfgFileFor(nm), HttpService:JSONEncode(data)) end)
     cfgMsg.Text = ok and ("saved '"..nm.."'") or "save failed"
+    if ok then notify("Config", "saved '"..nm.."'") end
 end
 function loadConfig()
     if not canFile then cfgMsg.Text="no file API" return end
@@ -1186,8 +1234,11 @@ function loadConfig()
     if ak then apply("AimKey", ak) end
     local pk=keyFromSave(data.PanicKey)
     if pk then apply("PanicKey", pk) end
+    local mk=keyFromSave(data.MenuKey)
+    if mk then apply("MenuKey", mk) end
     aimingOn=false
     cfgMsg.Text="loaded '"..nm.."'"
+    notify("Config", "loaded '"..nm.."'")
 end
 
 local function clearESP(player)
@@ -1605,7 +1656,7 @@ track(UserInputService.InputBegan:Connect(function(inp,gpe)
         return
     end
     if gpe then return end
-    if inp.KeyCode==Enum.KeyCode.RightShift then main.Visible=not main.Visible return end
+    if keyMatches(Settings.MenuKey, inp) then main.Visible=not main.Visible return end
     if Settings.AimMode=="Toggle" and Settings.AimEnabled and keyMatches(Settings.AimKey, inp) then
         aimingOn=not aimingOn
     end
@@ -1614,7 +1665,7 @@ end))
 local function finishLoading()
     if Unloaded or LoadingDone or not gateOpen() then return end
     LoadingDone=true
-    print("[NOVA] v6.8 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
+    print("[NOVA] v6.9 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
     pcall(function() loading:Destroy() end)
     pcall(function() main.Visible=true end)
     for _,p in ipairs(Players:GetPlayers()) do
