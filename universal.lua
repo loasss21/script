@@ -1,4 +1,4 @@
--- NOVA v6.7 SINGLE FILE | ESP / Aimbot / Misc (South Bronx auto-detect)
+-- NOVA v6.8 SINGLE FILE | ESP / Aimbot / Misc (South Bronx auto-detect)
 -- Menu: RightShift (drag via welcome header) • Panic default: Delete
 
 local Players = game:GetService("Players")
@@ -11,7 +11,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = Players.LocalPlayer
 
-print("[NOVA] v6.7 boot (single file)")
+print("[NOVA] v6.8 boot (single file)")
 
 -- KEY SYSTEM: set true + put your keys in VALID_KEYS to lock the script
 local KeySystemEnabled = false
@@ -29,7 +29,7 @@ local IS_SOUTH_BRONX = (detectedUniverse == SOUTH_BRONX_UNIVERSE) or (SOUTH_BRON
 local GAME_VERSION = IS_SOUTH_BRONX and "South Bronx" or "Universal"
 local FILE_TAG = "single"
 
-print("[NOVA] v6.7 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
+print("[NOVA] v6.8 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
 
 local THEME = {
     BG = Color3.fromRGB(16,16,22),
@@ -76,6 +76,13 @@ Settings.Target = Profile.defaultTarget
 Settings.Priority = Profile.defaultPriority
 Settings.MaxDistance = Profile.defaultMaxDistance
 Settings.Inventory = Profile.inventoryDefault
+
+-- loader mode: ESP_ONLY hides the whole aimbot side (tab, FOV, trigger)
+local ESP_ONLY = false
+pcall(function()
+    local g = getgenv and getgenv()
+    if type(g)=="table" and g.NOVA_MODE=="esp" then ESP_ONLY=true end
+end)
 
 local Unloaded = false
 local LoadingDone = false
@@ -280,7 +287,7 @@ pct.BackgroundTransparency=1 pct.Text="0%" pct.Font=Enum.Font.GothamBold
 pct.TextSize=12 pct.TextColor3=Color3.new(1,1,1) pct.Parent=loading
 local loadVer=Instance.new("TextLabel")
 loadVer.Size=UDim2.new(1,0,0,16) loadVer.Position=UDim2.new(0,0,0,164)
-loadVer.BackgroundTransparency=1 loadVer.Text="v6.7 ("..FILE_TAG..")"
+loadVer.BackgroundTransparency=1 loadVer.Text="v6.8 ("..FILE_TAG..")"
 loadVer.Font=Enum.Font.Gotham loadVer.TextSize=11 loadVer.TextColor3=THEME.TextDim loadVer.Parent=loading
 task.spawn(function()
     local ok, info = pcall(function() return MarketplaceService:GetProductInfo(detectedPlace) end)
@@ -318,7 +325,7 @@ w2.BackgroundTransparency=1 w2.Text="NOVA" w2.Font=Enum.Font.GothamBold
 w2.TextSize=24 w2.TextColor3=Color3.new(1,1,1) w2.TextXAlignment=Enum.TextXAlignment.Left w2.Parent=head
 local w3=Instance.new("TextLabel")
 w3.Size=UDim2.new(1,-14,0,16) w3.Position=UDim2.new(0,7,0,56)
-w3.BackgroundTransparency=1 w3.Text="V 6.7 • "..GAME_VERSION w3.Font=Enum.Font.Gotham
+w3.BackgroundTransparency=1 w3.Text="V 6.8 • "..GAME_VERSION w3.Font=Enum.Font.Gotham
 w3.TextSize=12 w3.TextColor3=THEME.TextDim w3.TextXAlignment=Enum.TextXAlignment.Left w3.Parent=head
 local headLine=Instance.new("Frame")
 headLine.Size=UDim2.new(1,-14,0,2) headLine.Position=UDim2.new(0,7,0,78)
@@ -412,6 +419,7 @@ navESP.MouseButton1Click:Connect(function() setTab("ESP") end)
 navAim.MouseButton1Click:Connect(function() setTab("Aim") end)
 navMisc.MouseButton1Click:Connect(function() setTab("Misc") end)
 setTab("ESP")
+if ESP_ONLY then navAim.Visible=false end
 
 local function regHandle(id, setFn)
     UIHandles[id]=setFn
@@ -732,7 +740,8 @@ do
     end)
 end
 
--- AIMBOT TAB
+-- AIMBOT TAB (skipped in ESP-only mode)
+if not ESP_ONLY then
 local a=1
 pageHeader(aimPage,a,"Aimbot") a=a+1
 do local r=newRow(aimPage,a); a=a+1
@@ -755,13 +764,14 @@ do local r=newRow(aimPage,a); a=a+1
     createToggle(r,2,"Trigger","Triggerbot",false,function(v) Settings.Trigger=v end,0.5,-3)
 end
 createSlider(aimPage,a,"MaxDistance","Max Distance",100,5000,Settings.MaxDistance,function(v) Settings.MaxDistance=v end) a=a+1
+end -- aim tab
 
 -- MISC TAB
 local mo=1
 pageHeader(miscPage,mo,"Misc") mo=mo+1
 local statLbl=Instance.new("TextLabel")
 statLbl.LayoutOrder=mo mo=mo+1 statLbl.Size=UDim2.new(1,-4,0,20) statLbl.BackgroundTransparency=1
-statLbl.Text="NOVA v6.7 • "..GAME_VERSION statLbl.Font=Enum.Font.GothamBold
+statLbl.Text="NOVA v6.8 • "..GAME_VERSION statLbl.Font=Enum.Font.GothamBold
 statLbl.TextSize=13 statLbl.TextColor3=Color3.new(1,1,1) statLbl.TextXAlignment=Enum.TextXAlignment.Left statLbl.Parent=miscPage
 local perfLbl=Instance.new("TextLabel")
 perfLbl.LayoutOrder=mo mo=mo+1 perfLbl.Size=UDim2.new(1,-4,0,18) perfLbl.BackgroundTransparency=1
@@ -883,8 +893,6 @@ local function clearESP(player)
     local d=ESPData[player]
     if d then
         pcall(function() d.box:Destroy() end) pcall(function() d.name:Destroy() end)
-        pcall(function() d.hpbg:Destroy() end)
-        pcall(function() d.hpbg:Destroy() end)
         pcall(function() if d.tracer then d.tracer:Destroy() end end)
         ESPData[player]=nil
     end
@@ -978,13 +986,7 @@ local function createESP(player)
     pcall(function() name:SetAttribute("nx",1) end)
     local myHrp0=LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     name.Text=buildLabelText(player, hrp, myHrp0)
-    local hpbg=Instance.new("Frame")
-    hpbg.AnchorPoint=Vector2.new(0.5,0.5) hpbg.BackgroundColor3=Color3.fromRGB(20,20,20)
-    hpbg.BorderSizePixel=0 hpbg.Active=false hpbg.Visible=false hpbg.Parent=overlayGui
-    pcall(function() hpbg:SetAttribute("nx",1) end)
-    local hpfill=Instance.new("Frame")
-    hpfill.AnchorPoint=Vector2.new(0,1) hpfill.Size=UDim2.new(1,0,1,0) hpfill.Position=UDim2.new(0,0,1,0)
-    hpfill.BackgroundColor3=Color3.fromRGB(0,255,0) hpfill.BorderSizePixel=0 hpfill.Active=false hpfill.Parent=hpbg
+    -- (health bar removed)
     local parts={
         Head=head, HRP=hrp,
         Upper=char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"),
@@ -992,7 +994,7 @@ local function createESP(player)
     local tracer=Instance.new("Frame")
     tracer.AnchorPoint=Vector2.new(0.5,0.5) tracer.BorderSizePixel=0 tracer.Active=false
     tracer.BackgroundColor3=Settings.Color tracer.Visible=false tracer.Parent=overlayGui
-    ESPData[player]={box=box,stroke=stroke,name=name,hpbg=hpbg,hpfill=hpfill,parts=parts,hrp=hrp,hum=hum,tracer=tracer}
+    ESPData[player]={box=box,stroke=stroke,name=name,parts=parts,hrp=hrp,hum=hum,tracer=tracer}
     creating[player]=nil
 end
 
@@ -1017,7 +1019,6 @@ local function hideOverlay(d)
     if not d then return end
     if d.box then d.box.Visible=false end
     if d.name then d.name.Visible=false end
-    if d.hpbg then d.hpbg.Visible=false end
     if d.tracer then d.tracer.Visible=false end
 end
 
@@ -1046,9 +1047,6 @@ local function updateBox2D(d, cam, col, myHrp, hrp, showBox, showName)
     d.box.Visible=showBox
     d.name.Position=UDim2.new(0,cx,0,top-52)
     d.name.Visible=showName
-    d.hpbg.Size=UDim2.new(0,4,0,boxH)
-    d.hpbg.Position=UDim2.new(0,cx-boxW/2-7,0,top)
-    d.hpbg.Visible=showBox
 end
 
 local rayParams=RaycastParams.new() rayParams.FilterType=Enum.RaycastFilterType.Exclude rayParams.IgnoreWater=true
@@ -1186,7 +1184,7 @@ renderConn=track(RunService.RenderStepped:Connect(function()
     local espOn=Settings.ESPEnabled
     local boxesOn=Settings.Boxes
     local maxESP2=Settings.MaxESP*Settings.MaxESP
-    if Settings.AimEnabled and Settings.ShowFOV then
+    if not ESP_ONLY and Settings.AimEnabled and Settings.ShowFOV then
         fovCircle.Visible=true
         if lastFOV~=Settings.FOV then
             lastFOV=Settings.FOV
@@ -1222,9 +1220,6 @@ renderConn=track(RunService.RenderStepped:Connect(function()
                     if show and doLabels then
                         d.name.Text=buildLabelText(player, hrp, myHrp)
                         if d.name.TextColor3~=col then d.name.TextColor3=col end
-                        local frac=math.clamp(hum.Health/math.max(1,hum.MaxHealth),0,1)
-                        d.hpfill.Size=UDim2.new(1,0,frac,0)
-                        d.hpfill.BackgroundColor3=Color3.fromRGB(math.floor(255*(1-frac)),math.floor(255*frac),40)
                     elseif show and d.name.TextColor3~=col then
                         d.name.TextColor3=col
                     end
@@ -1251,7 +1246,7 @@ renderConn=track(RunService.RenderStepped:Connect(function()
             perfLbl.Text="FPS: "..fpsShown.." • Players: "..#Players:GetPlayers()
         end)
     end
-    if Settings.Trigger and nowC-lastTrig>0.12 then
+    if not ESP_ONLY and Settings.Trigger and nowC-lastTrig>0.12 then
         lastTrig=nowC
         if canClick and myHrp then
             local ray=cam:ViewportPointToRay(mousePos.X, mousePos.Y)
@@ -1280,7 +1275,7 @@ renderConn=track(RunService.RenderStepped:Connect(function()
         end
     end
     local wantAim=false
-    if Settings.AimEnabled and not Unloaded then
+    if not ESP_ONLY and Settings.AimEnabled and not Unloaded then
         if Settings.AimMode=="Toggle" then wantAim=aimingOn
         else wantAim=isAimHeld() end
     end
@@ -1318,7 +1313,7 @@ end))
 local function finishLoading()
     if Unloaded or LoadingDone or not gateOpen() then return end
     LoadingDone=true
-    print("[NOVA] v6.7 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
+    print("[NOVA] v6.8 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
     pcall(function() loading:Destroy() end)
     pcall(function() main.Visible=true end)
     for _,p in ipairs(Players:GetPlayers()) do

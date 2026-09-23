@@ -1,4 +1,4 @@
--- NOVA v6.7 SOUTH BRONX FILE | ESP / Aimbot / Misc (South Bronx: The Trenches)
+-- NOVA v6.8 SOUTH BRONX FILE | ESP / Aimbot / Misc / Farm (South Bronx: The Trenches)
 -- Menu: RightShift (drag via welcome header) • Panic default: Delete
 
 local Players = game:GetService("Players")
@@ -9,9 +9,10 @@ local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local VirtualUser = game:GetService("VirtualUser")
+local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
-print("[NOVA] v6.7 boot (southbronx file)")
+print("[NOVA] v6.8 boot (southbronx file)")
 
 -- KEY SYSTEM: set true + put your keys in VALID_KEYS to lock the script
 local KeySystemEnabled = false
@@ -27,7 +28,7 @@ local detectedUniverse, detectedPlace = 0, 0
 pcall(function() detectedUniverse = game.GameId end)
 pcall(function() detectedPlace = game.PlaceId end)
 
-print("[NOVA] v6.7 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
+print("[NOVA] v6.8 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
 
 local THEME = {
     BG = Color3.fromRGB(16,16,22),
@@ -74,6 +75,13 @@ Settings.Target = Profile.defaultTarget
 Settings.Priority = Profile.defaultPriority
 Settings.MaxDistance = Profile.defaultMaxDistance
 Settings.Inventory = Profile.inventoryDefault
+
+-- loader mode: ESP_ONLY hides the whole aimbot side (tab, FOV, trigger)
+local ESP_ONLY = false
+pcall(function()
+    local g = getgenv and getgenv()
+    if type(g)=="table" and g.NOVA_MODE=="esp" then ESP_ONLY=true end
+end)
 
 local Unloaded = false
 local LoadingDone = false
@@ -278,7 +286,7 @@ pct.BackgroundTransparency=1 pct.Text="0%" pct.Font=Enum.Font.GothamBold
 pct.TextSize=12 pct.TextColor3=Color3.new(1,1,1) pct.Parent=loading
 local loadVer=Instance.new("TextLabel")
 loadVer.Size=UDim2.new(1,0,0,16) loadVer.Position=UDim2.new(0,0,0,164)
-loadVer.BackgroundTransparency=1 loadVer.Text="v6.7 ("..FILE_TAG..")"
+loadVer.BackgroundTransparency=1 loadVer.Text="v6.8 ("..FILE_TAG..")"
 loadVer.Font=Enum.Font.Gotham loadVer.TextSize=11 loadVer.TextColor3=THEME.TextDim loadVer.Parent=loading
 task.spawn(function()
     local ok, info = pcall(function() return MarketplaceService:GetProductInfo(detectedPlace) end)
@@ -316,7 +324,7 @@ w2.BackgroundTransparency=1 w2.Text="NOVA" w2.Font=Enum.Font.GothamBold
 w2.TextSize=24 w2.TextColor3=Color3.new(1,1,1) w2.TextXAlignment=Enum.TextXAlignment.Left w2.Parent=head
 local w3=Instance.new("TextLabel")
 w3.Size=UDim2.new(1,-14,0,16) w3.Position=UDim2.new(0,7,0,56)
-w3.BackgroundTransparency=1 w3.Text="V 6.7 • "..GAME_VERSION w3.Font=Enum.Font.Gotham
+w3.BackgroundTransparency=1 w3.Text="V 6.8 • "..GAME_VERSION w3.Font=Enum.Font.Gotham
 w3.TextSize=12 w3.TextColor3=THEME.TextDim w3.TextXAlignment=Enum.TextXAlignment.Left w3.Parent=head
 local headLine=Instance.new("Frame")
 headLine.Size=UDim2.new(1,-14,0,2) headLine.Position=UDim2.new(0,7,0,78)
@@ -356,7 +364,7 @@ local function mkNavBtn(name, order)
     local s=Instance.new("UIStroke") s.Color=THEME.Stroke s.Thickness=1 s.Parent=b
     return b
 end
-local navESP=mkNavBtn("ESP",1) local navAim=mkNavBtn("Aimbot",2) local navMisc=mkNavBtn("Misc",3)
+local navESP=mkNavBtn("ESP",1) local navAim=mkNavBtn("Aimbot",2) local navMisc=mkNavBtn("Misc",3) local navFarm=mkNavBtn("Farm",4)
 
 local foot=Instance.new("Frame")
 foot.Size=UDim2.new(1,-14,0,60) foot.Position=UDim2.new(0,7,1,-66)
@@ -391,25 +399,27 @@ local function mkPage()
     pad.PaddingTop=UDim.new(0,2) pad.PaddingLeft=UDim.new(0,2) pad.PaddingRight=UDim.new(0,6) pad.PaddingBottom=UDim.new(0,12) pad.Parent=p
     return p
 end
-local espPage=mkPage() local aimPage=mkPage() local miscPage=mkPage()
-aimPage.Visible=false miscPage.Visible=false
+local espPage=mkPage() local aimPage=mkPage() local miscPage=mkPage() local farmPage=mkPage()
+aimPage.Visible=false miscPage.Visible=false farmPage.Visible=false
 
 local function paintNav(which)
     local function st(b,on)
         if on then b.BackgroundColor3=THEME.Accent b.TextColor3=Color3.new(1,1,1)
         else b.BackgroundColor3=THEME.Item b.TextColor3=THEME.TextDim end
     end
-    st(navESP,which=="ESP") st(navAim,which=="Aim") st(navMisc,which=="Misc")
+    st(navESP,which=="ESP") st(navAim,which=="Aim") st(navMisc,which=="Misc") st(navFarm,which=="Farm")
 end
 local function setTab(w)
-    espPage.Visible=(w=="ESP") aimPage.Visible=(w=="Aim") miscPage.Visible=(w=="Misc")
-    espPage.CanvasPosition=Vector2.new(0,0) aimPage.CanvasPosition=Vector2.new(0,0) miscPage.CanvasPosition=Vector2.new(0,0)
+    espPage.Visible=(w=="ESP") aimPage.Visible=(w=="Aim") miscPage.Visible=(w=="Misc") farmPage.Visible=(w=="Farm")
+    espPage.CanvasPosition=Vector2.new(0,0) aimPage.CanvasPosition=Vector2.new(0,0) miscPage.CanvasPosition=Vector2.new(0,0) farmPage.CanvasPosition=Vector2.new(0,0)
     paintNav(w)
 end
 navESP.MouseButton1Click:Connect(function() setTab("ESP") end)
 navAim.MouseButton1Click:Connect(function() setTab("Aim") end)
 navMisc.MouseButton1Click:Connect(function() setTab("Misc") end)
+navFarm.MouseButton1Click:Connect(function() setTab("Farm") end)
 setTab("ESP")
+if ESP_ONLY then navAim.Visible=false end
 
 local function regHandle(id, setFn)
     UIHandles[id]=setFn
@@ -730,7 +740,8 @@ do
     end)
 end
 
--- AIMBOT TAB
+-- AIMBOT TAB (skipped in ESP-only mode)
+if not ESP_ONLY then
 local a=1
 pageHeader(aimPage,a,"Aimbot") a=a+1
 do local r=newRow(aimPage,a); a=a+1
@@ -753,13 +764,315 @@ do local r=newRow(aimPage,a); a=a+1
     createToggle(r,2,"Trigger","Triggerbot",false,function(v) Settings.Trigger=v end,0.5,-3)
 end
 createSlider(aimPage,a,"MaxDistance","Max Distance",100,5000,Settings.MaxDistance,function(v) Settings.MaxDistance=v end) a=a+1
+end -- aim tab
+
+-- FARM TAB (southbronx file only: movement, ATM/marsh farm, teleports)
+local SB = {Fly=false, FlySpeed=60, Noclip=false, AutoATM=false, ATMCooldown=10, SafeTP=true, MarshFarm=false}
+local sbATMs = {}
+local sbSpots = {}
+local atmRunning, marshRunning = false, false
+local SB_POIS = {
+    {"Bank", -52.00, -3.42, -333.68},
+    {"Hospital", 1065.49, -3.80, 529.20},
+    {"Dealership", 730.46, -3.45, 446.10},
+    {"Marshmallow", 509.78, -3.57, 599.79},
+    {"Illegal Guns", 753.72, -3.67, 41.51},
+    {"Gun Shop 1", 219.32, -3.43, -177.49},
+    {"Gun Shop 2", -466.83, -3.30, 350.52},
+    {"Boxes", -534.31, -3.42, -84.77},
+    {"Buy Potato", -797.78, -3.50, -170.59},
+    {"Casino", 1176.07, -3.40, -20.96},
+}
+
+local farmMsgLbl, atmCountLbl, atmMsgLbl, tpMsgLbl, tpBox
+local function farmMsg(t) pcall(function() if farmMsgLbl then farmMsgLbl.Text=t end end) end
+local function atmMsg(t) pcall(function() if atmMsgLbl then atmMsgLbl.Text=t end end) end
+local function tpMsg(t) pcall(function() if tpMsgLbl then tpMsgLbl.Text=t end end) end
+
+local function stopFly()
+    local char=LocalPlayer.Character
+    local hrp=char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then pcall(function() hrp.Anchored=false end) end
+end
+
+local function groundY(x, z)
+    local char=LocalPlayer.Character
+    local params=RaycastParams.new()
+    params.FilterType=Enum.RaycastFilterType.Exclude
+    params.IgnoreWater=true
+    params.FilterDescendantsInstances=char and {char} or {}
+    local res=Workspace:Raycast(Vector3.new(x,120,z), Vector3.new(0,-300,0), params)
+    if res then return res.Position.Y+3 end
+    return nil
+end
+
+local function teleportTo(cf)
+    local char=LocalPlayer.Character
+    local hrp=char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then farmMsg("no character") return false end
+    local dest=cf
+    local gy=groundY(cf.Position.X, cf.Position.Z)
+    if gy then
+        local flat=hrp.CFrame-hrp.CFrame.Position
+        dest=CFrame.new(cf.Position.X, gy, cf.Position.Z)*flat
+    end
+    local ok=false
+    pcall(function()
+        if SB.SafeTP then
+            local dist=(hrp.Position-dest.Position).Magnitude
+            local tw=TweenService:Create(hrp, TweenInfo.new(math.clamp(dist/120,0.4,2), Enum.EasingStyle.Linear), {CFrame=dest})
+            tw:Play()
+        else
+            hrp.CFrame=dest
+        end
+        ok=true
+    end)
+    return ok
+end
+
+local function fireNearbyPrompts(radius)
+    if typeof(fireproximityprompt)~="function" then return -1 end
+    local char=LocalPlayer.Character
+    local hrp=char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return 0 end
+    local n=0
+    for _,d in ipairs(Workspace:GetDescendants()) do
+        if d:IsA("ProximityPrompt") and d.Enabled then
+            local okp, part = pcall(function()
+                local a=d.Parent
+                if a and a:IsA("BasePart") then return a end
+                if a and a:IsA("Attachment") then return a.Parent end
+                local m=d:FindFirstAncestorOfClass("Model")
+                if m then return m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart", true) end
+                return nil
+            end)
+            if okp and part and typeof(part.Position)=="Vector3" and (part.Position-hrp.Position).Magnitude<=radius then
+                pcall(fireproximityprompt, d)
+                n=n+1
+            end
+        end
+    end
+    return n
+end
+
+local function scanATMs()
+    sbATMs={}
+    for _,d in ipairs(Workspace:GetDescendants()) do
+        if d:IsA("ProximityPrompt") then
+            local okp, info = pcall(function()
+                local m=d:FindFirstAncestorOfClass("Model")
+                local nm=((m and m.Name) or (d.Parent and d.Parent.Name) or ""):lower()
+                if not nm:find("atm") then return nil end
+                local part=nil
+                local a=d.Parent
+                if a and a:IsA("BasePart") then part=a
+                elseif m then part=m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart", true) end
+                if part then return {prompt=d, pos=part.Position} end
+                return nil
+            end)
+            if okp and info then table.insert(sbATMs, info) end
+        end
+    end
+    return #sbATMs
+end
+
+local function atmLoop()
+    if atmRunning then return end
+    atmRunning=true
+    task.spawn(function()
+        if typeof(fireproximityprompt)~="function" then atmMsg("need fireproximityprompt") end
+        while SB.AutoATM and not Unloaded and not runStale() do
+            if #sbATMs==0 then
+                atmMsg("no ATMs — press Scan")
+                task.wait(1)
+            else
+                for i,atm in ipairs(sbATMs) do
+                    if not SB.AutoATM or Unloaded then break end
+                    local char=LocalPlayer.Character
+                    local hrp=char and char:FindFirstChild("HumanoidRootPart")
+                    if not hrp then break end
+                    if atm.prompt and atm.prompt.Parent then
+                        atmMsg("ATM "..i.."/"..#sbATMs)
+                        teleportTo(CFrame.new(atm.pos+Vector3.new(0,3,0)))
+                        task.wait(1.2)
+                        pcall(fireproximityprompt, atm.prompt)
+                    end
+                    local waited=0
+                    while waited<SB.ATMCooldown and SB.AutoATM and not Unloaded do task.wait(0.5) waited=waited+0.5 end
+                end
+            end
+        end
+        atmRunning=false
+    end)
+end
+
+local function findMarshField()
+    for _,e in ipairs(SB_POIS) do if e[1]=="Marshmallow" then return e end end
+    return nil
+end
+
+local function marshLoop()
+    if marshRunning then return end
+    marshRunning=true
+    task.spawn(function()
+        local field=findMarshField()
+        while SB.MarshFarm and not Unloaded and not runStale() do
+            if field then
+                teleportTo(CFrame.new(field[2], field[3], field[4]))
+                task.wait(1.5)
+            end
+            local t=0
+            while t<45 and SB.MarshFarm and not Unloaded do
+                local n=fireNearbyPrompts(18)
+                if n<0 then farmMsg("need fireproximityprompt") task.wait(2)
+                else farmMsg("marsh: "..n.." prompts fired") task.wait(2) end
+                t=t+2
+            end
+        end
+        marshRunning=false
+    end)
+end
+
+local function findPlayerPartial(s)
+    s=(s or ""):lower()
+    if s=="" then return nil end
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p~=LocalPlayer and (p.Name:lower():find(s,1,true) or p.DisplayName:lower():find(s,1,true)) then
+            return p
+        end
+    end
+    return nil
+end
+
+local function findPOI(s)
+    s=(s or ""):lower()
+    if s=="" then return nil end
+    for _,e in ipairs(SB_POIS) do
+        if e[1]:lower():find(s,1,true) then return e end
+    end
+    return nil
+end
+
+track(RunService.Heartbeat:Connect(function(dt)
+    if Unloaded or runStale() then return end
+    if not SB.Fly then return end
+    local char=LocalPlayer.Character
+    local hrp=char and char:FindFirstChild("HumanoidRootPart")
+    local cam=Workspace.CurrentCamera
+    if not hrp or not cam then return end
+    dt=dt or 0.016
+    pcall(function()
+        hrp.Anchored=true
+        hrp.AssemblyLinearVelocity=Vector3.new()
+        hrp.AssemblyAngularVelocity=Vector3.new()
+        local cf=cam.CFrame
+        local move=Vector3.new()
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move=move+cf.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move=move-cf.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move=move-cf.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move=move+cf.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move=move+Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.C) then move=move-Vector3.new(0,1,0) end
+        if move.Magnitude>0.01 then move=move.Unit end
+        hrp.CFrame=hrp.CFrame+move*SB.FlySpeed*math.min(dt,0.1)
+    end)
+end))
+track(RunService.Stepped:Connect(function()
+    if Unloaded or runStale() then return end
+    if not SB.Noclip then return end
+    local char=LocalPlayer.Character
+    if not char then return end
+    for _,p in ipairs(char:GetDescendants()) do
+        if p:IsA("BasePart") then p.CanCollide=false end
+    end
+end))
+
+local fzb=1
+pageHeader(farmPage,fzb,"Farm — South Bronx") fzb=fzb+1
+createToggle(farmPage,fzb,nil,"Fly",false,function(v) SB.Fly=v if not v then stopFly() end end) fzb=fzb+1
+createSlider(farmPage,fzb,nil,"Fly Speed",16,200,SB.FlySpeed,function(v) SB.FlySpeed=v end) fzb=fzb+1
+createToggle(farmPage,fzb,nil,"Noclip",false,function(v) SB.Noclip=v end) fzb=fzb+1
+createToggle(farmPage,fzb,nil,"Safe Tween TP",true,function(v) SB.SafeTP=v end) fzb=fzb+1
+local scanBtn=Instance.new("TextButton")
+scanBtn.LayoutOrder=fzb fzb=fzb+1 scanBtn.Size=UDim2.new(1,-4,0,28) scanBtn.Text="Scan ATMs"
+scanBtn.Font=Enum.Font.GothamBold scanBtn.TextSize=13 scanBtn.BackgroundColor3=THEME.Item
+scanBtn.TextColor3=Color3.new(1,1,1) scanBtn.AutoButtonColor=false scanBtn.Active=true scanBtn.Parent=farmPage
+local scanBtnC=Instance.new("UICorner") scanBtnC.CornerRadius=UDim.new(0,8) scanBtnC.Parent=scanBtn
+atmCountLbl=Instance.new("TextLabel")
+atmCountLbl.LayoutOrder=fzb fzb=fzb+1 atmCountLbl.Size=UDim2.new(1,-4,0,16) atmCountLbl.BackgroundTransparency=1
+atmCountLbl.Text="ATMs found: --" atmCountLbl.Font=Enum.Font.Gotham
+atmCountLbl.TextSize=12 atmCountLbl.TextColor3=THEME.TextDim atmCountLbl.TextXAlignment=Enum.TextXAlignment.Left atmCountLbl.Parent=farmPage
+scanBtn.MouseButton1Click:Connect(function()
+    local n=0
+    pcall(function() n=scanATMs() end)
+    atmCountLbl.Text="ATMs found: "..n
+end)
+createToggle(farmPage,fzb,nil,"Auto ATM Farm",false,function(v) SB.AutoATM=v if v then atmLoop() end end) fzb=fzb+1
+createSlider(farmPage,fzb,nil,"ATM Cooldown",4,30,SB.ATMCooldown,function(v) SB.ATMCooldown=v end) fzb=fzb+1
+createToggle(farmPage,fzb,nil,"Marshmallow Farm",false,function(v) SB.MarshFarm=v if v then marshLoop() end end) fzb=fzb+1
+atmMsgLbl=Instance.new("TextLabel")
+atmMsgLbl.LayoutOrder=fzb fzb=fzb+1 atmMsgLbl.Size=UDim2.new(1,-4,0,16) atmMsgLbl.BackgroundTransparency=1
+atmMsgLbl.Text="" atmMsgLbl.Font=Enum.Font.Gotham
+atmMsgLbl.TextSize=11 atmMsgLbl.TextColor3=THEME.TextDim atmMsgLbl.TextXAlignment=Enum.TextXAlignment.Left atmMsgLbl.Parent=farmPage
+farmMsgLbl=atmMsgLbl
+tpBox=Instance.new("TextBox")
+tpBox.LayoutOrder=fzb fzb=fzb+1 tpBox.Size=UDim2.new(1,-4,0,28)
+tpBox.BackgroundColor3=THEME.Item tpBox.Text="" tpBox.PlaceholderText="player, spot or place (e.g. bank)"
+tpBox.Font=Enum.Font.Gotham tpBox.TextSize=13 tpBox.TextColor3=Color3.new(1,1,1)
+tpBox.ClearTextOnFocus=false tpBox.Parent=farmPage
+local tpBoxC=Instance.new("UICorner") tpBoxC.CornerRadius=UDim.new(0,8) tpBoxC.Parent=tpBox
+do local r=newRow(farmPage,fzb); fzb=fzb+1
+    local saveBtn=Instance.new("TextButton")
+    saveBtn.LayoutOrder=1 saveBtn.Size=UDim2.new(0.5,-3,0,28) saveBtn.Text="Save Spot"
+    saveBtn.Font=Enum.Font.GothamBold saveBtn.TextSize=13 saveBtn.BackgroundColor3=THEME.Item
+    saveBtn.TextColor3=Color3.new(1,1,1) saveBtn.AutoButtonColor=false saveBtn.Active=true saveBtn.Parent=r
+    local saveBtnC=Instance.new("UICorner") saveBtnC.CornerRadius=UDim.new(0,8) saveBtnC.Parent=saveBtn
+    local tpBtn=Instance.new("TextButton")
+    tpBtn.LayoutOrder=2 tpBtn.Size=UDim2.new(0.5,-3,0,28) tpBtn.Text="Teleport"
+    tpBtn.Font=Enum.Font.GothamBold tpBtn.TextSize=13 tpBtn.BackgroundColor3=THEME.Accent
+    tpBtn.TextColor3=Color3.new(1,1,1) tpBtn.AutoButtonColor=false tpBtn.Active=true tpBtn.Parent=r
+    local tpBtnC=Instance.new("UICorner") tpBtnC.CornerRadius=UDim.new(0,8) tpBtnC.Parent=tpBtn
+    saveBtn.MouseButton1Click:Connect(function()
+        local n=((tpBox.Text or ""):gsub("^%s+",""):gsub("%s+$",""):lower())
+        local char=LocalPlayer.Character
+        local hrp=char and char:FindFirstChild("HumanoidRootPart")
+        if n~="" and hrp then sbSpots[n]=hrp.Position tpMsg("saved '"..n.."'") else tpMsg("type a name first") end
+    end)
+    tpBtn.MouseButton1Click:Connect(function()
+        local q=((tpBox.Text or ""):gsub("^%s+",""):gsub("%s+$",""):lower())
+        if q=="" then tpMsg("type a name first") return end
+        local p=findPlayerPartial(q)
+        if p and p.Character then
+            local hrp=p.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                if teleportTo(CFrame.new(hrp.Position+Vector3.new(0,3,0))) then tpMsg("tp: "..p.DisplayName) else tpMsg("tp failed") end
+                return
+            end
+        end
+        if sbSpots[q] then
+            local v=sbSpots[q]
+            if teleportTo(CFrame.new(v.X, v.Y+1, v.Z)) then tpMsg("tp: spot '"..q.."'") else tpMsg("tp failed") end
+            return
+        end
+        local poi=findPOI(q)
+        if poi then
+            if teleportTo(CFrame.new(poi[2], poi[3], poi[4])) then tpMsg("tp: "..poi[1]) else tpMsg("tp failed") end
+            return
+        end
+        tpMsg("not found: "..q)
+    end)
+end
+tpMsgLbl=Instance.new("TextLabel")
+tpMsgLbl.LayoutOrder=fzb fzb=fzb+1 tpMsgLbl.Size=UDim2.new(1,-4,0,16) tpMsgLbl.BackgroundTransparency=1
+tpMsgLbl.Text="" tpMsgLbl.Font=Enum.Font.Gotham
+tpMsgLbl.TextSize=11 tpMsgLbl.TextColor3=THEME.TextDim tpMsgLbl.TextXAlignment=Enum.TextXAlignment.Left tpMsgLbl.Parent=farmPage
 
 -- MISC TAB
 local mo=1
 pageHeader(miscPage,mo,"Misc") mo=mo+1
 local statLbl=Instance.new("TextLabel")
 statLbl.LayoutOrder=mo mo=mo+1 statLbl.Size=UDim2.new(1,-4,0,20) statLbl.BackgroundTransparency=1
-statLbl.Text="NOVA v6.7 • "..GAME_VERSION statLbl.Font=Enum.Font.GothamBold
+statLbl.Text="NOVA v6.8 • "..GAME_VERSION statLbl.Font=Enum.Font.GothamBold
 statLbl.TextSize=13 statLbl.TextColor3=Color3.new(1,1,1) statLbl.TextXAlignment=Enum.TextXAlignment.Left statLbl.Parent=miscPage
 local perfLbl=Instance.new("TextLabel")
 perfLbl.LayoutOrder=mo mo=mo+1 perfLbl.Size=UDim2.new(1,-4,0,18) perfLbl.BackgroundTransparency=1
@@ -881,8 +1194,6 @@ local function clearESP(player)
     local d=ESPData[player]
     if d then
         pcall(function() d.box:Destroy() end) pcall(function() d.name:Destroy() end)
-        pcall(function() d.hpbg:Destroy() end)
-        pcall(function() d.hpbg:Destroy() end)
         pcall(function() if d.tracer then d.tracer:Destroy() end end)
         ESPData[player]=nil
     end
@@ -976,13 +1287,7 @@ local function createESP(player)
     pcall(function() name:SetAttribute("nx",1) end)
     local myHrp0=LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     name.Text=buildLabelText(player, hrp, myHrp0)
-    local hpbg=Instance.new("Frame")
-    hpbg.AnchorPoint=Vector2.new(0.5,0.5) hpbg.BackgroundColor3=Color3.fromRGB(20,20,20)
-    hpbg.BorderSizePixel=0 hpbg.Active=false hpbg.Visible=false hpbg.Parent=overlayGui
-    pcall(function() hpbg:SetAttribute("nx",1) end)
-    local hpfill=Instance.new("Frame")
-    hpfill.AnchorPoint=Vector2.new(0,1) hpfill.Size=UDim2.new(1,0,1,0) hpfill.Position=UDim2.new(0,0,1,0)
-    hpfill.BackgroundColor3=Color3.fromRGB(0,255,0) hpfill.BorderSizePixel=0 hpfill.Active=false hpfill.Parent=hpbg
+    -- (health bar removed)
     local parts={
         Head=head, HRP=hrp,
         Upper=char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"),
@@ -990,7 +1295,7 @@ local function createESP(player)
     local tracer=Instance.new("Frame")
     tracer.AnchorPoint=Vector2.new(0.5,0.5) tracer.BorderSizePixel=0 tracer.Active=false
     tracer.BackgroundColor3=Settings.Color tracer.Visible=false tracer.Parent=overlayGui
-    ESPData[player]={box=box,stroke=stroke,name=name,hpbg=hpbg,hpfill=hpfill,parts=parts,hrp=hrp,hum=hum,tracer=tracer}
+    ESPData[player]={box=box,stroke=stroke,name=name,parts=parts,hrp=hrp,hum=hum,tracer=tracer}
     creating[player]=nil
 end
 
@@ -1015,7 +1320,6 @@ local function hideOverlay(d)
     if not d then return end
     if d.box then d.box.Visible=false end
     if d.name then d.name.Visible=false end
-    if d.hpbg then d.hpbg.Visible=false end
     if d.tracer then d.tracer.Visible=false end
 end
 
@@ -1044,9 +1348,6 @@ local function updateBox2D(d, cam, col, myHrp, hrp, showBox, showName)
     d.box.Visible=showBox
     d.name.Position=UDim2.new(0,cx,0,top-52)
     d.name.Visible=showName
-    d.hpbg.Size=UDim2.new(0,4,0,boxH)
-    d.hpbg.Position=UDim2.new(0,cx-boxW/2-7,0,top)
-    d.hpbg.Visible=showBox
 end
 
 local rayParams=RaycastParams.new() rayParams.FilterType=Enum.RaycastFilterType.Exclude rayParams.IgnoreWater=true
@@ -1184,7 +1485,7 @@ renderConn=track(RunService.RenderStepped:Connect(function()
     local espOn=Settings.ESPEnabled
     local boxesOn=Settings.Boxes
     local maxESP2=Settings.MaxESP*Settings.MaxESP
-    if Settings.AimEnabled and Settings.ShowFOV then
+    if not ESP_ONLY and Settings.AimEnabled and Settings.ShowFOV then
         fovCircle.Visible=true
         if lastFOV~=Settings.FOV then
             lastFOV=Settings.FOV
@@ -1220,9 +1521,6 @@ renderConn=track(RunService.RenderStepped:Connect(function()
                     if show and doLabels then
                         d.name.Text=buildLabelText(player, hrp, myHrp)
                         if d.name.TextColor3~=col then d.name.TextColor3=col end
-                        local frac=math.clamp(hum.Health/math.max(1,hum.MaxHealth),0,1)
-                        d.hpfill.Size=UDim2.new(1,0,frac,0)
-                        d.hpfill.BackgroundColor3=Color3.fromRGB(math.floor(255*(1-frac)),math.floor(255*frac),40)
                     elseif show and d.name.TextColor3~=col then
                         d.name.TextColor3=col
                     end
@@ -1249,7 +1547,7 @@ renderConn=track(RunService.RenderStepped:Connect(function()
             perfLbl.Text="FPS: "..fpsShown.." • Players: "..#Players:GetPlayers()
         end)
     end
-    if Settings.Trigger and nowC-lastTrig>0.12 then
+    if not ESP_ONLY and Settings.Trigger and nowC-lastTrig>0.12 then
         lastTrig=nowC
         if canClick and myHrp then
             local ray=cam:ViewportPointToRay(mousePos.X, mousePos.Y)
@@ -1278,7 +1576,7 @@ renderConn=track(RunService.RenderStepped:Connect(function()
         end
     end
     local wantAim=false
-    if Settings.AimEnabled and not Unloaded then
+    if not ESP_ONLY and Settings.AimEnabled and not Unloaded then
         if Settings.AimMode=="Toggle" then wantAim=aimingOn
         else wantAim=isAimHeld() end
     end
@@ -1316,7 +1614,7 @@ end))
 local function finishLoading()
     if Unloaded or LoadingDone or not gateOpen() then return end
     LoadingDone=true
-    print("[NOVA] v6.7 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
+    print("[NOVA] v6.8 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
     pcall(function() loading:Destroy() end)
     pcall(function() main.Visible=true end)
     for _,p in ipairs(Players:GetPlayers()) do
