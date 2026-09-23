@@ -1,4 +1,4 @@
--- NOVA v6.4 SINGLE FILE | ESP / Aimbot / Misc (South Bronx auto-detect)
+-- NOVA v6.5 SINGLE FILE | ESP / Aimbot / Misc (South Bronx auto-detect)
 -- Menu: RightShift (drag via welcome header) • Panic default: Delete
 
 local Players = game:GetService("Players")
@@ -11,7 +11,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = Players.LocalPlayer
 
-print("[NOVA] v6.4 boot (single file)")
+print("[NOVA] v6.5 boot (single file)")
 
 -- KEY SYSTEM: set true + put your keys in VALID_KEYS to lock the script
 local KeySystemEnabled = false
@@ -29,7 +29,7 @@ local IS_SOUTH_BRONX = (detectedUniverse == SOUTH_BRONX_UNIVERSE) or (SOUTH_BRON
 local GAME_VERSION = IS_SOUTH_BRONX and "South Bronx" or "Universal"
 local FILE_TAG = "single"
 
-print("[NOVA] v6.4 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
+print("[NOVA] v6.5 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
 
 local THEME = {
     BG = Color3.fromRGB(16,16,22),
@@ -43,7 +43,7 @@ local THEME = {
 local Settings = {
     ESPEnabled = true, Boxes = true, Names = true, Distance = true,
     TeamCheck = false, MaxESP = 2000,
-    Tracers = false,
+    Tracers = false, Inventory = false,
     Color = Color3.fromRGB(255,0,0),
     AimEnabled = false, AimMethod = "Camera", AimMode = "Hold",
     AimKey = {Type="Mouse", Button=Enum.UserInputType.MouseButton2, Name="RMB"},
@@ -63,16 +63,19 @@ local Profile = {
     defaultTarget = "Head",
     defaultPriority = "Closest",
     defaultMaxDistance = 1000,
+    inventoryDefault = false,
 }
 if IS_SOUTH_BRONX then
-    -- SB-specifiek komt hier; voor nu identiek aan Universal:
+    -- SB-specifiek: inventory-lijn standaard aan in South Bronx.
     Profile.defaultTarget = "Head"
     Profile.defaultPriority = "Closest"
     Profile.defaultMaxDistance = 1000
+    Profile.inventoryDefault = true
 end
 Settings.Target = Profile.defaultTarget
 Settings.Priority = Profile.defaultPriority
 Settings.MaxDistance = Profile.defaultMaxDistance
+Settings.Inventory = Profile.inventoryDefault
 
 local Unloaded = false
 local LoadingDone = false
@@ -252,7 +255,7 @@ pct.BackgroundTransparency=1 pct.Text="0%" pct.Font=Enum.Font.GothamBold
 pct.TextSize=12 pct.TextColor3=Color3.new(1,1,1) pct.Parent=loading
 local loadVer=Instance.new("TextLabel")
 loadVer.Size=UDim2.new(1,0,0,16) loadVer.Position=UDim2.new(0,0,0,164)
-loadVer.BackgroundTransparency=1 loadVer.Text="v6.4 ("..FILE_TAG..")"
+loadVer.BackgroundTransparency=1 loadVer.Text="v6.5 ("..FILE_TAG..")"
 loadVer.Font=Enum.Font.Gotham loadVer.TextSize=11 loadVer.TextColor3=THEME.TextDim loadVer.Parent=loading
 task.spawn(function()
     local ok, info = pcall(function() return MarketplaceService:GetProductInfo(detectedPlace) end)
@@ -290,7 +293,7 @@ w2.BackgroundTransparency=1 w2.Text="NOVA" w2.Font=Enum.Font.GothamBold
 w2.TextSize=24 w2.TextColor3=Color3.new(1,1,1) w2.TextXAlignment=Enum.TextXAlignment.Left w2.Parent=head
 local w3=Instance.new("TextLabel")
 w3.Size=UDim2.new(1,-14,0,16) w3.Position=UDim2.new(0,7,0,56)
-w3.BackgroundTransparency=1 w3.Text="V 6.4 • "..GAME_VERSION w3.Font=Enum.Font.Gotham
+w3.BackgroundTransparency=1 w3.Text="V 6.5 • "..GAME_VERSION w3.Font=Enum.Font.Gotham
 w3.TextSize=12 w3.TextColor3=THEME.TextDim w3.TextXAlignment=Enum.TextXAlignment.Left w3.Parent=head
 local headLine=Instance.new("Frame")
 headLine.Size=UDim2.new(1,-14,0,2) headLine.Position=UDim2.new(0,7,0,78)
@@ -577,6 +580,7 @@ do local r=newRow(espPage,o); o=o+1
     createToggle(r,1,"TeamCheck","Team Check",false,function(v) Settings.TeamCheck=v end,0.5,-3)
     createToggle(r,2,"Tracers","Tracers",false,function(v) Settings.Tracers=v end,0.5,-3)
 end
+createToggle(espPage,o,"Inventory","Inventory",Profile.inventoryDefault,function(v) Settings.Inventory=v end) o=o+1
 createSlider(espPage,o,"MaxESP","Max ESP Dist",100,5000,Settings.MaxESP,function(v) Settings.MaxESP=v end) o=o+1
 
 do
@@ -731,7 +735,7 @@ local mo=1
 pageHeader(miscPage,mo,"Misc") mo=mo+1
 local statLbl=Instance.new("TextLabel")
 statLbl.LayoutOrder=mo mo=mo+1 statLbl.Size=UDim2.new(1,-4,0,20) statLbl.BackgroundTransparency=1
-statLbl.Text="NOVA v6.4 • "..GAME_VERSION statLbl.Font=Enum.Font.GothamBold
+statLbl.Text="NOVA v6.5 • "..GAME_VERSION statLbl.Font=Enum.Font.GothamBold
 statLbl.TextSize=13 statLbl.TextColor3=Color3.new(1,1,1) statLbl.TextXAlignment=Enum.TextXAlignment.Left statLbl.Parent=miscPage
 local perfLbl=Instance.new("TextLabel")
 perfLbl.LayoutOrder=mo mo=mo+1 perfLbl.Size=UDim2.new(1,-4,0,18) perfLbl.BackgroundTransparency=1
@@ -739,6 +743,16 @@ perfLbl.Text="FPS: -- • Players: --" perfLbl.Font=Enum.Font.Gotham
 perfLbl.TextSize=12 perfLbl.TextColor3=THEME.TextDim perfLbl.TextXAlignment=Enum.TextXAlignment.Left perfLbl.Parent=miscPage
 createKeyPicker(miscPage,mo,"PanicKey","Panic Key","Delete",function(d) Settings.PanicKey=d end) mo=mo+1
 createToggle(miscPage,mo,"AFKProtect","Anti-AFK",true,function(v) Settings.AFKProtect=v end) mo=mo+1
+local cfgNameLbl=Instance.new("TextLabel")
+cfgNameLbl.LayoutOrder=mo mo=mo+1 cfgNameLbl.Size=UDim2.new(1,-4,0,16) cfgNameLbl.BackgroundTransparency=1
+cfgNameLbl.Text="Config name" cfgNameLbl.Font=Enum.Font.GothamBold
+cfgNameLbl.TextSize=12 cfgNameLbl.TextColor3=Color3.new(1,1,1) cfgNameLbl.TextXAlignment=Enum.TextXAlignment.Left cfgNameLbl.Parent=miscPage
+local cfgNameBox=Instance.new("TextBox")
+cfgNameBox.LayoutOrder=mo mo=mo+1 cfgNameBox.Size=UDim2.new(1,-4,0,28)
+cfgNameBox.BackgroundColor3=THEME.Item cfgNameBox.Text="" cfgNameBox.PlaceholderText="e.g. sb-main"
+cfgNameBox.Font=Enum.Font.Gotham cfgNameBox.TextSize=13 cfgNameBox.TextColor3=Color3.new(1,1,1)
+cfgNameBox.ClearTextOnFocus=false cfgNameBox.Parent=miscPage
+local cfgNameBoxC=Instance.new("UICorner") cfgNameBoxC.CornerRadius=UDim.new(0,8) cfgNameBoxC.Parent=cfgNameBox
 do local r=newRow(miscPage,mo); mo=mo+1
     local rj=Instance.new("TextButton")
     rj.LayoutOrder=1 rj.Size=UDim2.new(0.5,-3,0,30) rj.Text="Rejoin"
@@ -767,7 +781,15 @@ local cfgMsg=Instance.new("TextLabel")
 cfgMsg.LayoutOrder=mo mo=mo+1 cfgMsg.Size=UDim2.new(1,-4,0,16) cfgMsg.BackgroundTransparency=1
 cfgMsg.Text=canFile and "" or "configs need file API" cfgMsg.Font=Enum.Font.Gotham
 cfgMsg.TextSize=11 cfgMsg.TextColor3=THEME.TextDim cfgMsg.TextXAlignment=Enum.TextXAlignment.Left cfgMsg.Parent=miscPage
-local CFG_FILE="nova_cfg.json"
+local function cfgCleanName(s)
+    s=tostring(s or "")
+    s=s:gsub("[^%w%-_]","_"):sub(1,24)
+    if s=="" then s="default" end
+    return s
+end
+local function cfgFileFor(name)
+    return "nova_cfg_"..cfgCleanName(name)..".json"
+end
 local function keyToSave(k)
     if not k then return nil end
     if k.Type=="Mouse" then return {t="M", n=k.Name} end
@@ -791,7 +813,7 @@ function saveConfig()
     local data={
         ESPEnabled=Settings.ESPEnabled, Boxes=Settings.Boxes, Names=Settings.Names,
         Distance=Settings.Distance, TeamCheck=Settings.TeamCheck,
-        MaxESP=Settings.MaxESP, Tracers=Settings.Tracers,
+        MaxESP=Settings.MaxESP, Tracers=Settings.Tracers, Inventory=Settings.Inventory,
         Color={math.floor(c.R*255+0.5), math.floor(c.G*255+0.5), math.floor(c.B*255+0.5)},
         AimEnabled=Settings.AimEnabled, AimMethod=Settings.AimMethod, AimMode=Settings.AimMode,
         FOV=Settings.FOV, ShowFOV=Settings.ShowFOV, Smoothing=Settings.Smoothing,
@@ -800,20 +822,22 @@ function saveConfig()
         MaxDistance=Settings.MaxDistance,
         AimKey=keyToSave(Settings.AimKey), PanicKey=keyToSave(Settings.PanicKey),
     }
-    local ok = pcall(function() writefile(CFG_FILE, HttpService:JSONEncode(data)) end)
-    cfgMsg.Text = ok and "saved" or "save failed"
+    local nm=cfgCleanName(cfgNameBox and cfgNameBox.Text or "")
+    local ok = pcall(function() writefile(cfgFileFor(nm), HttpService:JSONEncode(data)) end)
+    cfgMsg.Text = ok and ("saved '"..nm.."'") or "save failed"
 end
 function loadConfig()
     if not canFile then cfgMsg.Text="no file API" return end
-    local ok, raw = pcall(readfile, CFG_FILE)
-    if not ok or not raw then cfgMsg.Text="no save found" return end
+    local nm=cfgCleanName(cfgNameBox and cfgNameBox.Text or "")
+    local ok, raw = pcall(readfile, cfgFileFor(nm))
+    if not ok or not raw then cfgMsg.Text="no save '"..nm.."'" return end
     local ok2, data = pcall(HttpService.JSONDecode, HttpService, raw)
     if not ok2 or type(data)~="table" then cfgMsg.Text="save corrupted" return end
     local function apply(id, v)
         local fn=UIHandles[id]
         if fn and v~=nil then pcall(fn, v) end
     end
-    for _, id in ipairs({"ESPEnabled","Boxes","Names","Distance","TeamCheck","MaxESP","Tracers",
+    for _, id in ipairs({"ESPEnabled","Boxes","Names","Distance","TeamCheck","MaxESP","Inventory","Tracers",
         "AimEnabled","AimMethod","AimMode","FOV","ShowFOV","Smoothing","Target","Priority",
         "AimTeamCheck","WallCheck","NoKnock","Trigger","AFKProtect","MaxDistance"}) do
         apply(id, data[id])
@@ -826,7 +850,7 @@ function loadConfig()
     local pk=keyFromSave(data.PanicKey)
     if pk then apply("PanicKey", pk) end
     aimingOn=false
-    cfgMsg.Text="loaded"
+    cfgMsg.Text="loaded '"..nm.."'"
 end
 
 local function clearESP(player)
@@ -860,6 +884,29 @@ local function buildLabelText(player, hrp, myHrp)
         local sub="["..math.floor(math.sqrt(dx*dx+dy*dy+dz*dz)).."m]"
         if txt~="" then txt=txt.."\n" end
         txt=txt..sub
+    end
+    if Settings.Inventory then
+        local inv={}
+        pcall(function()
+            local bp=player:FindFirstChildOfClass("Backpack")
+            if bp then
+                for _,t in ipairs(bp:GetChildren()) do
+                    if t:IsA("Tool") then table.insert(inv, t.Name) end
+                end
+            end
+            local ch=player.Character
+            if ch then
+                for _,t in ipairs(ch:GetChildren()) do
+                    if t:IsA("Tool") then table.insert(inv, "[E] "..t.Name) end
+                end
+            end
+        end)
+        if #inv>0 then
+            local shown=table.concat(inv, ", ", 1, math.min(#inv, 4))
+            if #inv>4 then shown=shown.." +"..(#inv-4) end
+            if txt~="" then txt=txt.."\n" end
+            txt=txt.."["..shown.."]"
+        end
     end
     return txt
 end
@@ -1201,7 +1248,7 @@ end))
 local function finishLoading()
     if Unloaded or LoadingDone or not gateOpen() then return end
     LoadingDone=true
-    print("[NOVA] v6.4 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
+    print("[NOVA] v6.5 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
     pcall(function() loading:Destroy() end)
     pcall(function() main.Visible=true end)
     for _,p in ipairs(Players:GetPlayers()) do
