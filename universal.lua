@@ -1,4 +1,4 @@
--- NOVA v6.3 SINGLE FILE | ESP / Aimbot / Misc (South Bronx auto-detect)
+-- NOVA v6.4 SINGLE FILE | ESP / Aimbot / Misc (South Bronx auto-detect)
 -- Menu: RightShift (drag via welcome header) • Panic default: Delete
 
 local Players = game:GetService("Players")
@@ -8,9 +8,10 @@ local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local MarketplaceService = game:GetService("MarketplaceService")
+local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = Players.LocalPlayer
 
-print("[NOVA] v6.3 boot (single file)")
+print("[NOVA] v6.4 boot (single file)")
 
 -- KEY SYSTEM: set true + put your keys in VALID_KEYS to lock the script
 local KeySystemEnabled = false
@@ -28,7 +29,7 @@ local IS_SOUTH_BRONX = (detectedUniverse == SOUTH_BRONX_UNIVERSE) or (SOUTH_BRON
 local GAME_VERSION = IS_SOUTH_BRONX and "South Bronx" or "Universal"
 local FILE_TAG = "single"
 
-print("[NOVA] v6.3 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
+print("[NOVA] v6.4 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
 
 local THEME = {
     BG = Color3.fromRGB(16,16,22),
@@ -49,7 +50,7 @@ local Settings = {
     FOV = 120, ShowFOV = true, Smoothing = 6,
     Target = "Head", Priority = "Closest",
     AimTeamCheck = true, WallCheck = true, NoKnock = true, Trigger = false,
-    MaxDistance = 1000,
+    MaxDistance = 1000, AFKProtect = true,
     PanicKey = {Type="Key", Key=Enum.KeyCode.Delete, Name="Delete"},
 }
 
@@ -126,22 +127,18 @@ end))
 local function deepCleanCharacter(char)
     if not char then return end
     for _,d in ipairs(char:GetDescendants()) do
-        if d.Name=="ESPHL" or d.Name=="ESPBox" or d.Name=="ESPName" then
-            pcall(function() d:Destroy() end)
-        elseif d:IsA("Highlight") or d:IsA("BoxHandleAdornment") or d:IsA("SelectionBox") then
-            pcall(function() d:Destroy() end)
-        elseif d:IsA("BillboardGui") and (d.Name=="ESPBox" or d.Name=="ESPName") then
+        if d.Name=="ESPHL" or d.Name=="NovaBox" or d.Name=="NovaTag" then
             pcall(function() d:Destroy() end)
         end
     end
 end
-pcall(function() LocalPlayer.PlayerGui:FindFirstChild("ESPMenu"):Destroy() end)
-pcall(function() LocalPlayer.PlayerGui:FindFirstChild("NOVAOverlay"):Destroy() end)
-pcall(function() LocalPlayer.PlayerGui:FindFirstChild("ESPFOV"):Destroy() end)
+pcall(function() LocalPlayer.PlayerGui:FindFirstChild("NovaHub"):Destroy() end)
+pcall(function() LocalPlayer.PlayerGui:FindFirstChild("NovaFx"):Destroy() end)
+pcall(function() LocalPlayer.PlayerGui:FindFirstChild("NovaRing"):Destroy() end)
 if gethui then
-    pcall(function() gethui():FindFirstChild("ESPMenu"):Destroy() end)
-    pcall(function() gethui():FindFirstChild("NOVAOverlay"):Destroy() end)
-    pcall(function() gethui():FindFirstChild("ESPFOV"):Destroy() end)
+    pcall(function() gethui():FindFirstChild("NovaHub"):Destroy() end)
+    pcall(function() gethui():FindFirstChild("NovaFx"):Destroy() end)
+    pcall(function() gethui():FindFirstChild("NovaRing"):Destroy() end)
 end
 for _,p in ipairs(Players:GetPlayers()) do if p.Character then deepCleanCharacter(p.Character) end end
 
@@ -149,17 +146,17 @@ local parentGui = LocalPlayer:WaitForChild("PlayerGui")
 pcall(function() if gethui then parentGui = gethui() end end)
 
 local overlayGui = Instance.new("ScreenGui")
-overlayGui.Name="NOVAOverlay" overlayGui.ResetOnSpawn=false overlayGui.IgnoreGuiInset=true overlayGui.DisplayOrder=998 overlayGui.Parent=parentGui
+overlayGui.Name="NovaFx" overlayGui.ResetOnSpawn=false overlayGui.IgnoreGuiInset=true overlayGui.DisplayOrder=998 overlayGui.Parent=parentGui
 
 local fovGui = Instance.new("ScreenGui")
-fovGui.Name="ESPFOV" fovGui.ResetOnSpawn=false fovGui.IgnoreGuiInset=true fovGui.DisplayOrder=997 fovGui.Parent=parentGui
+fovGui.Name="NovaRing" fovGui.ResetOnSpawn=false fovGui.IgnoreGuiInset=true fovGui.DisplayOrder=997 fovGui.Parent=parentGui
 local fovCircle = Instance.new("Frame")
 fovCircle.AnchorPoint=Vector2.new(0.5,0.5) fovCircle.BackgroundTransparency=1 fovCircle.Visible=false fovCircle.Active=false fovCircle.Parent=fovGui
 local fC = Instance.new("UICorner") fC.CornerRadius=UDim.new(1,0) fC.Parent=fovCircle
 local fS = Instance.new("UIStroke") fS.Thickness=1.5 fS.Color=Color3.new(1,1,1) fS.Transparency=0.15 fS.Parent=fovCircle
 
 local gui = Instance.new("ScreenGui")
-gui.Name="ESPMenu" gui.ResetOnSpawn=false gui.DisplayOrder=999 gui.Parent=parentGui
+gui.Name="NovaHub" gui.ResetOnSpawn=false gui.DisplayOrder=999 gui.Parent=parentGui
 
 local keyFrame=nil local keyBox=nil local keyMsg=nil
 local keyTries=0
@@ -255,7 +252,7 @@ pct.BackgroundTransparency=1 pct.Text="0%" pct.Font=Enum.Font.GothamBold
 pct.TextSize=12 pct.TextColor3=Color3.new(1,1,1) pct.Parent=loading
 local loadVer=Instance.new("TextLabel")
 loadVer.Size=UDim2.new(1,0,0,16) loadVer.Position=UDim2.new(0,0,0,164)
-loadVer.BackgroundTransparency=1 loadVer.Text="v6.3 ("..FILE_TAG..")"
+loadVer.BackgroundTransparency=1 loadVer.Text="v6.4 ("..FILE_TAG..")"
 loadVer.Font=Enum.Font.Gotham loadVer.TextSize=11 loadVer.TextColor3=THEME.TextDim loadVer.Parent=loading
 task.spawn(function()
     local ok, info = pcall(function() return MarketplaceService:GetProductInfo(detectedPlace) end)
@@ -293,7 +290,7 @@ w2.BackgroundTransparency=1 w2.Text="NOVA" w2.Font=Enum.Font.GothamBold
 w2.TextSize=24 w2.TextColor3=Color3.new(1,1,1) w2.TextXAlignment=Enum.TextXAlignment.Left w2.Parent=head
 local w3=Instance.new("TextLabel")
 w3.Size=UDim2.new(1,-14,0,16) w3.Position=UDim2.new(0,7,0,56)
-w3.BackgroundTransparency=1 w3.Text="V 6.3 • "..GAME_VERSION w3.Font=Enum.Font.Gotham
+w3.BackgroundTransparency=1 w3.Text="V 6.4 • "..GAME_VERSION w3.Font=Enum.Font.Gotham
 w3.TextSize=12 w3.TextColor3=THEME.TextDim w3.TextXAlignment=Enum.TextXAlignment.Left w3.Parent=head
 local headLine=Instance.new("Frame")
 headLine.Size=UDim2.new(1,-14,0,2) headLine.Position=UDim2.new(0,7,0,78)
@@ -734,13 +731,14 @@ local mo=1
 pageHeader(miscPage,mo,"Misc") mo=mo+1
 local statLbl=Instance.new("TextLabel")
 statLbl.LayoutOrder=mo mo=mo+1 statLbl.Size=UDim2.new(1,-4,0,20) statLbl.BackgroundTransparency=1
-statLbl.Text="NOVA v6.3 • "..GAME_VERSION statLbl.Font=Enum.Font.GothamBold
+statLbl.Text="NOVA v6.4 • "..GAME_VERSION statLbl.Font=Enum.Font.GothamBold
 statLbl.TextSize=13 statLbl.TextColor3=Color3.new(1,1,1) statLbl.TextXAlignment=Enum.TextXAlignment.Left statLbl.Parent=miscPage
 local perfLbl=Instance.new("TextLabel")
 perfLbl.LayoutOrder=mo mo=mo+1 perfLbl.Size=UDim2.new(1,-4,0,18) perfLbl.BackgroundTransparency=1
 perfLbl.Text="FPS: -- • Players: --" perfLbl.Font=Enum.Font.Gotham
 perfLbl.TextSize=12 perfLbl.TextColor3=THEME.TextDim perfLbl.TextXAlignment=Enum.TextXAlignment.Left perfLbl.Parent=miscPage
 createKeyPicker(miscPage,mo,"PanicKey","Panic Key","Delete",function(d) Settings.PanicKey=d end) mo=mo+1
+createToggle(miscPage,mo,"AFKProtect","Anti-AFK",true,function(v) Settings.AFKProtect=v end) mo=mo+1
 do local r=newRow(miscPage,mo); mo=mo+1
     local rj=Instance.new("TextButton")
     rj.LayoutOrder=1 rj.Size=UDim2.new(0.5,-3,0,30) rj.Text="Rejoin"
@@ -798,7 +796,7 @@ function saveConfig()
         AimEnabled=Settings.AimEnabled, AimMethod=Settings.AimMethod, AimMode=Settings.AimMode,
         FOV=Settings.FOV, ShowFOV=Settings.ShowFOV, Smoothing=Settings.Smoothing,
         Target=Settings.Target, Priority=Settings.Priority, AimTeamCheck=Settings.AimTeamCheck,
-        WallCheck=Settings.WallCheck, NoKnock=Settings.NoKnock, Trigger=Settings.Trigger,
+        WallCheck=Settings.WallCheck, NoKnock=Settings.NoKnock, Trigger=Settings.Trigger, AFKProtect=Settings.AFKProtect,
         MaxDistance=Settings.MaxDistance,
         AimKey=keyToSave(Settings.AimKey), PanicKey=keyToSave(Settings.PanicKey),
     }
@@ -817,7 +815,7 @@ function loadConfig()
     end
     for _, id in ipairs({"ESPEnabled","Boxes","Names","Distance","TeamCheck","MaxESP","Tracers",
         "AimEnabled","AimMethod","AimMode","FOV","ShowFOV","Smoothing","Target","Priority",
-        "AimTeamCheck","WallCheck","NoKnock","Trigger","MaxDistance"}) do
+        "AimTeamCheck","WallCheck","NoKnock","Trigger","AFKProtect","MaxDistance"}) do
         apply(id, data[id])
     end
     if type(data.Color)=="table" then
@@ -893,12 +891,12 @@ local function createESP(player)
     local hum=char:FindFirstChildOfClass("Humanoid")
     if not hrp or not head or not hum then creating[player]=nil return end
     local boxGui=Instance.new("BillboardGui")
-    boxGui.Name="ESPBox" boxGui.Adornee=hrp boxGui.AlwaysOnTop=true boxGui.LightInfluence=0
+    boxGui.Name="NovaBox" boxGui.Adornee=hrp boxGui.AlwaysOnTop=true boxGui.LightInfluence=0
     boxGui.Size=UDim2.new(4,0,6.5,0) boxGui.ExtentsOffsetWorldSpace=Vector3.new(0,0.5,0) boxGui.Parent=hrp
     local bf=Instance.new("Frame") bf.Size=UDim2.new(1,0,1,0) bf.BackgroundTransparency=1 bf.Active=false bf.Parent=boxGui
     local stroke=Instance.new("UIStroke") stroke.Thickness=2 stroke.Color=Settings.Color stroke.Parent=bf
     local nameGui=Instance.new("BillboardGui")
-    nameGui.Name="ESPName" nameGui.Adornee=head nameGui.AlwaysOnTop=true
+    nameGui.Name="NovaTag" nameGui.Adornee=head nameGui.AlwaysOnTop=true
     nameGui.Size=UDim2.new(0,200,0,50) nameGui.ExtentsOffsetWorldSpace=Vector3.new(0,3.2,0)
     nameGui.LightInfluence=0 nameGui.Parent=head
     local label=Instance.new("TextLabel")
@@ -1049,6 +1047,14 @@ track(Players.PlayerAdded:Connect(function(p)
     end))
 end))
 track(Players.PlayerRemoving:Connect(function(p) clearESP(p) end))
+track(LocalPlayer.Idled:Connect(function()
+    if Settings.AFKProtect and not Unloaded and not runStale() then
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end)
+    end
+end))
 
 local renderConn=nil
 renderConn=track(RunService.RenderStepped:Connect(function()
@@ -1195,7 +1201,7 @@ end))
 local function finishLoading()
     if Unloaded or LoadingDone or not gateOpen() then return end
     LoadingDone=true
-    print("[NOVA] v6.3 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
+    print("[NOVA] v6.4 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
     pcall(function() loading:Destroy() end)
     pcall(function() main.Visible=true end)
     for _,p in ipairs(Players:GetPlayers()) do

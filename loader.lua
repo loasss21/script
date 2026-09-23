@@ -1,4 +1,4 @@
--- NOVA loader v6.3: run THIS, it pulls the right file for the game.
+-- NOVA loader v6.4: run THIS, it pulls the right file for the game.
 -- Needs ONE of: game:HttpGet, game:HttpGetAsync, request/syn.request/http_request.
 -- If none exist, run nova.lua directly instead.
 
