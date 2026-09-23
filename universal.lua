@@ -1,4 +1,4 @@
--- NOVA v6.9 SINGLE FILE | ESP / Aimbot / Misc (South Bronx auto-detect)
+-- NOVA v7.0 SINGLE FILE | ESP / Aimbot / Misc (South Bronx auto-detect)
 -- Menu: RightShift (drag via welcome header) • Panic default: Delete
 
 local Players = game:GetService("Players")
@@ -11,7 +11,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local VirtualUser = game:GetService("VirtualUser")
 local LocalPlayer = Players.LocalPlayer
 
-print("[NOVA] v6.9 boot (single file)")
+print("[NOVA] v7.0 boot (single file)")
 
 -- KEY SYSTEM: set true + put your keys in VALID_KEYS to lock the script
 local KeySystemEnabled = false
@@ -29,7 +29,7 @@ local IS_SOUTH_BRONX = (detectedUniverse == SOUTH_BRONX_UNIVERSE) or (SOUTH_BRON
 local GAME_VERSION = IS_SOUTH_BRONX and "South Bronx" or "Universal"
 local FILE_TAG = "single"
 
-print("[NOVA] v6.9 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
+print("[NOVA] v7.0 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
 
 local THEME = {
     BG = Color3.fromRGB(16,16,22),
@@ -330,7 +330,7 @@ pct.BackgroundTransparency=1 pct.Text="0%" pct.Font=Enum.Font.GothamBold
 pct.TextSize=12 pct.TextColor3=Color3.new(1,1,1) pct.Parent=loading
 local loadVer=Instance.new("TextLabel")
 loadVer.Size=UDim2.new(1,0,0,16) loadVer.Position=UDim2.new(0,0,0,164)
-loadVer.BackgroundTransparency=1 loadVer.Text="v6.9 ("..FILE_TAG..")"
+loadVer.BackgroundTransparency=1 loadVer.Text="v7.0 ("..FILE_TAG..")"
 loadVer.Font=Enum.Font.Gotham loadVer.TextSize=11 loadVer.TextColor3=THEME.TextDim loadVer.Parent=loading
 task.spawn(function()
     local ok, info = pcall(function() return MarketplaceService:GetProductInfo(detectedPlace) end)
@@ -368,7 +368,7 @@ w2.BackgroundTransparency=1 w2.Text="NOVA" w2.Font=Enum.Font.GothamBold
 w2.TextSize=24 w2.TextColor3=Color3.new(1,1,1) w2.TextXAlignment=Enum.TextXAlignment.Left w2.Parent=head
 local w3=Instance.new("TextLabel")
 w3.Size=UDim2.new(1,-14,0,16) w3.Position=UDim2.new(0,7,0,56)
-w3.BackgroundTransparency=1 w3.Text="V 6.9 • "..GAME_VERSION w3.Font=Enum.Font.Gotham
+w3.BackgroundTransparency=1 w3.Text="V 7.0 • "..GAME_VERSION w3.Font=Enum.Font.Gotham
 w3.TextSize=12 w3.TextColor3=THEME.TextDim w3.TextXAlignment=Enum.TextXAlignment.Left w3.Parent=head
 local headLine=Instance.new("Frame")
 headLine.Size=UDim2.new(1,-14,0,2) headLine.Position=UDim2.new(0,7,0,78)
@@ -814,7 +814,7 @@ local mo=1
 pageHeader(miscPage,mo,"Misc") mo=mo+1
 local statLbl=Instance.new("TextLabel")
 statLbl.LayoutOrder=mo mo=mo+1 statLbl.Size=UDim2.new(1,-4,0,20) statLbl.BackgroundTransparency=1
-statLbl.Text="NOVA v6.9 • "..GAME_VERSION statLbl.Font=Enum.Font.GothamBold
+statLbl.Text="NOVA v7.0 • "..GAME_VERSION statLbl.Font=Enum.Font.GothamBold
 statLbl.TextSize=13 statLbl.TextColor3=Color3.new(1,1,1) statLbl.TextXAlignment=Enum.TextXAlignment.Left statLbl.Parent=miscPage
 local perfLbl=Instance.new("TextLabel")
 perfLbl.LayoutOrder=mo mo=mo+1 perfLbl.Size=UDim2.new(1,-4,0,18) perfLbl.BackgroundTransparency=1
@@ -940,7 +940,7 @@ end
 local function clearESP(player)
     local d=ESPData[player]
     if d then
-        pcall(function() d.box:Destroy() end) pcall(function() d.name:Destroy() end)
+        pcall(function() d.boxGui:Destroy() end) pcall(function() d.nameGui:Destroy() end)
         pcall(function() if d.tracer then d.tracer:Destroy() end end)
         ESPData[player]=nil
     end
@@ -1021,19 +1021,25 @@ local function createESP(player)
     local head=char:FindFirstChild("Head")
     local hum=char:FindFirstChildOfClass("Humanoid")
     if not hrp or not head or not hum then creating[player]=nil return end
-    -- 2D overlay ESP: zero instances inside characters (client scanners find nothing)
-    local box=Instance.new("Frame")
-    box.AnchorPoint=Vector2.new(0.5,0.5) box.BackgroundTransparency=1 box.Active=false box.Visible=false box.Parent=overlayGui
-    pcall(function() box:SetAttribute("nx",1) end)
-    local stroke=Instance.new("UIStroke") stroke.Thickness=2 stroke.Color=Settings.Color stroke.Parent=box
-    local name=Instance.new("TextLabel")
-    name.AnchorPoint=Vector2.new(0.5,0) name.BackgroundTransparency=1 name.Active=false
-    name.Size=UDim2.new(0,260,0,52) name.Font=Enum.Font.GothamBold name.TextSize=13
-    name.TextStrokeTransparency=0 name.TextXAlignment=Enum.TextXAlignment.Center
-    name.Text="" name.TextColor3=Settings.Color name.Visible=false name.Parent=overlayGui
-    pcall(function() name:SetAttribute("nx",1) end)
+    -- billboard-anchored ESP: engine positions it, always hugs the body
+    local boxGui=Instance.new("BillboardGui")
+    boxGui.Name="NovaBox" boxGui.Adornee=hrp boxGui.AlwaysOnTop=true boxGui.LightInfluence=0
+    boxGui.Size=UDim2.new(4,0,6.5,0) boxGui.ExtentsOffsetWorldSpace=Vector3.new(0,0.5,0) boxGui.Parent=hrp
+    pcall(function() boxGui:SetAttribute("nx",1) end)
+    local bf=Instance.new("Frame") bf.Size=UDim2.new(1,0,1,0) bf.BackgroundTransparency=1 bf.Active=false bf.Parent=boxGui
+    local stroke=Instance.new("UIStroke") stroke.Thickness=2 stroke.Color=Settings.Color stroke.Parent=bf
+    local nameGui=Instance.new("BillboardGui")
+    nameGui.Name="NovaTag" nameGui.Adornee=head nameGui.AlwaysOnTop=true
+    nameGui.Size=UDim2.new(0,220,0,66) nameGui.ExtentsOffsetWorldSpace=Vector3.new(0,3.4,0)
+    nameGui.LightInfluence=0 nameGui.Parent=head
+    pcall(function() nameGui:SetAttribute("nx",1) end)
+    local label=Instance.new("TextLabel")
+    label.Size=UDim2.new(1,0,1,0) label.BackgroundTransparency=1
+    label.Font=Enum.Font.GothamBold label.TextSize=13 label.TextStrokeTransparency=0
+    label.TextXAlignment=Enum.TextXAlignment.Center
+    label.Text="" label.TextColor3=Settings.Color label.Parent=nameGui
     local myHrp0=LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    name.Text=buildLabelText(player, hrp, myHrp0)
+    label.Text=buildLabelText(player, hrp, myHrp0)
     -- (health bar removed)
     local parts={
         Head=head, HRP=hrp,
@@ -1042,7 +1048,7 @@ local function createESP(player)
     local tracer=Instance.new("Frame")
     tracer.AnchorPoint=Vector2.new(0.5,0.5) tracer.BorderSizePixel=0 tracer.Active=false
     tracer.BackgroundColor3=Settings.Color tracer.Visible=false tracer.Parent=overlayGui
-    ESPData[player]={box=box,stroke=stroke,name=name,parts=parts,hrp=hrp,hum=hum,tracer=tracer}
+    ESPData[player]={boxGui=boxGui,stroke=stroke,nameGui=nameGui,nameLabel=label,parts=parts,hrp=hrp,hum=hum,tracer=tracer}
     creating[player]=nil
 end
 
@@ -1065,36 +1071,7 @@ end
 
 local function hideOverlay(d)
     if not d then return end
-    if d.box then d.box.Visible=false end
-    if d.name then d.name.Visible=false end
     if d.tracer then d.tracer.Visible=false end
-end
-
-local function updateBox2D(d, cam, col, myHrp, hrp, showBox, showName)
-    -- anchored to projected head-top + feet: exact on screen at ANY distance,
-    -- no FOV/size math that can oversize. OverlayY calibrates client offset.
-    local head=d.parts.Head
-    if not head or head.Parent==nil then hideOverlay(d) return end
-    local pTop, okT = cam:WorldToViewportPoint(head.Position+Vector3.new(0,0.7,0))
-    local pBot, okB = cam:WorldToViewportPoint(hrp.Position-Vector3.new(0,3.0,0))
-    if not okT or not okB then hideOverlay(d) return end
-    local asz=overlayGui.AbsoluteSize
-    local vpsz=cam.ViewportSize
-    local ox=(asz.X-vpsz.X)
-    local oy=(asz.Y-vpsz.Y)+Settings.OverlayY
-    local topX, topY = pTop.X+ox, pTop.Y+oy
-    local botX, botY = pBot.X+ox, pBot.Y+oy
-    local boxH=botY-topY
-    if boxH<12 then hideOverlay(d) return end
-    if boxH>800 then boxH=800 end
-    local boxW=boxH*0.6
-    local cx=(topX+botX)/2
-    local top=botY-boxH
-    d.box.Size=UDim2.new(0,boxW,0,boxH)
-    d.box.Position=UDim2.new(0,cx-boxW/2,0,top)
-    d.box.Visible=showBox
-    d.name.Position=UDim2.new(0,cx,0,top-52)
-    d.name.Visible=showName
 end
 
 local rayParams=RaycastParams.new() rayParams.FilterType=Enum.RaycastFilterType.Exclude rayParams.IgnoreWater=true
@@ -1249,7 +1226,7 @@ renderConn=track(RunService.RenderStepped:Connect(function()
             local d=ESPData[player]
             if d==nil then
                 if not creating[player] and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then tryCreate(player) end
-            elseif d.hrp.Parent==nil or d.hum.Parent==nil or d.box.Parent==nil or d.name.Parent==nil then
+            elseif d.hrp.Parent==nil or d.hum.Parent==nil or d.boxGui.Parent==nil or d.nameGui.Parent==nil then
                 tryCreate(player)
             else
                 local hrp=d.hrp local hum=d.hum
@@ -1262,19 +1239,18 @@ renderConn=track(RunService.RenderStepped:Connect(function()
                 end
                 if show and Settings.TeamCheck and player.Team~=nil and myTeam~=nil and player.Team==myTeam then show=false end
                 local okP = pcall(function()
-                    local showBox=show and boxesOn
-                    local showName=show and (Settings.Names or Settings.Distance)
+                    d.boxGui.Enabled=show and boxesOn
+                    d.nameGui.Enabled=show and (Settings.Names or Settings.Distance)
                     if d.stroke.Color~=col then d.stroke.Color=col end
                     if show and doLabels then
-                        d.name.Text=buildLabelText(player, hrp, myHrp)
-                        if d.name.TextColor3~=col then d.name.TextColor3=col end
-                    elseif show and d.name.TextColor3~=col then
-                        d.name.TextColor3=col
+                        d.nameLabel.Text=buildLabelText(player, hrp, myHrp)
+                        if d.nameLabel.TextColor3~=col then d.nameLabel.TextColor3=col end
+                    elseif show and d.nameLabel.TextColor3~=col then
+                        d.nameLabel.TextColor3=col
                     end
                     if not show then
                         hideOverlay(d)
                     elseif doOverlay then
-                        updateBox2D(d, cam, col, myHrp, hrp, showBox, showName)
                         if show and Settings.Tracers and scrW>0 then
                             local sp,ok=cam:WorldToViewportPoint(hrp.Position)
                             if ok then drawLine(d.tracer, scrW*0.5, scrH, sp.X+offX, sp.Y+offY+Settings.OverlayY, col)
@@ -1361,7 +1337,7 @@ end))
 local function finishLoading()
     if Unloaded or LoadingDone or not gateOpen() then return end
     LoadingDone=true
-    print("[NOVA] v6.9 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
+    print("[NOVA] v7.0 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
     pcall(function() loading:Destroy() end)
     pcall(function() main.Visible=true end)
     for _,p in ipairs(Players:GetPlayers()) do
