@@ -43,12 +43,12 @@ local THEME = {
 local Settings = {
     ESPEnabled = true, Boxes = true, Names = true, Distance = true,
     TeamCheck = true, MaxESP = 2000, OverlayY = 0,
-    Tracers = false, Inventory = false, Chams = false,
+    Tracers = false, Inventory = false, Chams = false, HealthBar = false,
     Color = Color3.fromRGB(255,0,0),
     AimEnabled = false, AimMethod = "Camera", AimMode = "Hold",
     AimKey = {Type="Mouse", Button=Enum.UserInputType.MouseButton2, Name="RMB"},
     FOV = 100, ShowFOV = true, Smoothing = 4,
-    Target = "Head", Priority = "Closest", AimLock = false,
+    Target = "Head", Priority = "Closest", AimLock = false, Prediction = 0,
     AimTeamCheck = true, WallCheck = true, NoKnock = true,
     TrigEnabled = false, TrigMode = "Always", TrigTarget = "Any",
     TrigTeamCheck = true, TrigNoKnock = true, TrigDelay = 120, TrigIndicator = true,
@@ -90,7 +90,20 @@ local lastAttempt = {}
 local creating = {}
 local function track(c) table.insert(Conns,c) return c end
 local hasMouseMove = typeof(mousemoverel) == "function"
-local canClick = typeof(mouse1click) == "function"
+-- click fallback chain: mouse1click -> VirtualInputManager -> Tool:Activate
+local vimSvc = nil
+pcall(function() vimSvc = game:GetService("VirtualInputManager") end)
+local function fireClick(x, y)
+    if typeof(mouse1click)=="function" then pcall(mouse1click) return "mouse" end
+    if vimSvc then
+        local ok=pcall(function() vimSvc:SendMouseButtonEvent(x, y, 0, true, game, 1) end)
+        pcall(function() vimSvc:SendMouseButtonEvent(x, y, 0, false, game, 1) end)
+        if ok then return "vim" end
+    end
+    local tool=LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+    if tool then pcall(function() tool:Activate() end) return "tool" end
+    return nil
+end
 local canFile = typeof(writefile) == "function" and typeof(readfile) == "function" and typeof(isfile) == "function"
 local mouseWarned = false
 local trigWarned = false
@@ -99,6 +112,7 @@ local lastFOV = -1
 local aimingOn = false
 local trigAcquireT = 0
 local lockedPlayer = nil
+local trigMsgLbl = nil
 local fpsAcc, fpsShown, fpsClock = 0, 60, os.clock()
 local openDropClose = nil
 -- runtime caches: avoid per-frame GetPlayers() alloc + per-label Backpack scans
@@ -681,6 +695,7 @@ do local r=newRow(espPage,o); o=o+1
     createToggle(r,1,"Inventory","Inventory",Profile.inventoryDefault,function(v) Settings.Inventory=v end,0.5,-3)
     createToggle(r,2,"Chams","Chams",false,function(v) Settings.Chams=v end,0.5,-3)
 end
+createToggle(espPage,o,"HealthBar","Health Bar",false,function(v) Settings.HealthBar=v end) o=o+1
 createSlider(espPage,o,"MaxESP","Max ESP Dist",100,5000,Settings.MaxESP,function(v) Settings.MaxESP=v end) o=o+1
 createSlider(espPage,o,"OverlayY","Overlay Y-Shift",-100,100,Settings.OverlayY,function(v) Settings.OverlayY=v end) o=o+1
 
@@ -872,6 +887,7 @@ createDropdown(aimBotBox,ab,"AimMode","Mode",{"Hold","Toggle"},Settings.AimMode,
 createKeyPicker(aimBotBox,ab,"AimKey","Hold Key","RMB",function(d) Settings.AimKey=d aimingOn=false end) ab=ab+1
 createSlider(aimBotBox,ab,"FOV","FOV",20,500,Settings.FOV,function(v) Settings.FOV=v end) ab=ab+1
 createSlider(aimBotBox,ab,"Smoothing","Smoothing",1,20,Settings.Smoothing,function(v) Settings.Smoothing=v end) ab=ab+1
+createSlider(aimBotBox,ab,"Prediction","Prediction",0,20,Settings.Prediction,function(v) Settings.Prediction=v end) ab=ab+1
 createDropdown(aimBotBox,ab,"Target","Target",{"Head","HRP","Closest"},Settings.Target,function(v) Settings.Target=v end) ab=ab+1
 createDropdown(aimBotBox,ab,"Priority","Priority",{"Closest","Low HP"},Settings.Priority,function(v) Settings.Priority=v end) ab=ab+1
 do local r=newRow(aimBotBox,ab); ab=ab+1
@@ -901,6 +917,10 @@ do
     info.Font=Enum.Font.Gotham info.TextSize=11 info.TextColor3=THEME.TextDim
     info.TextWrapped=true info.Parent=trigBox
 end
+trigMsgLbl=Instance.new("TextLabel")
+trigMsgLbl.LayoutOrder=tc tc=tc+1 trigMsgLbl.Size=UDim2.new(1,-4,0,16) trigMsgLbl.BackgroundTransparency=1
+trigMsgLbl.Text="status: off" trigMsgLbl.Font=Enum.Font.Gotham
+trigMsgLbl.TextSize=11 trigMsgLbl.TextColor3=THEME.TextDim trigMsgLbl.TextXAlignment=Enum.TextXAlignment.Left trigMsgLbl.Parent=trigBox
 end -- aim tab
 
 -- UTILITY STATE + LOOPS (movement, world)
@@ -1291,6 +1311,7 @@ function saveConfig()
         TrigTeamCheck=Settings.TrigTeamCheck, TrigNoKnock=Settings.TrigNoKnock,
         TrigDelay=Settings.TrigDelay, TrigIndicator=Settings.TrigIndicator,
         Chams=Settings.Chams, AimLock=Settings.AimLock, Crosshair=Util.Crosshair,
+        HealthBar=Settings.HealthBar, Prediction=Settings.Prediction,
         SilentEnabled=ARS.SilentEnabled, SilentTeam=ARS.SilentTeam, SilentTarget=ARS.SilentTarget,
         SilentFOV=ARS.SilentFOV, SilentChance=ARS.SilentChance,
         NoSpread=ARS.NoSpread, NoRecoil=ARS.NoRecoil, RapidFire=ARS.RapidFire,
@@ -1322,7 +1343,7 @@ function loadConfig()
         "AimEnabled","AimMethod","AimMode","FOV","ShowFOV","Smoothing","Target","Priority",
         "AimTeamCheck","WallCheck","NoKnock","AFKProtect","MaxDistance",
         "TrigEnabled","TrigMode","TrigTarget","TrigTeamCheck","TrigNoKnock","TrigDelay","TrigIndicator",
-        "Chams","AimLock","Crosshair",
+        "Chams","AimLock","Crosshair","HealthBar","Prediction",
         "SilentEnabled","SilentTeam","SilentTarget","SilentFOV","SilentChance",
         "NoSpread","NoRecoil","RapidFire","FastReload","FullAuto","HitboxExpand","HitboxSize",
         "WalkSpeed","JumpPower","InfJump","Fly","FlySpeed","Noclip","Fullbright","CamFOV","ClickTP"}) do
@@ -1578,6 +1599,13 @@ local function createESP(player)
     label.Font=Enum.Font.GothamBold label.TextSize=13 label.TextStrokeTransparency=0
     label.TextXAlignment=Enum.TextXAlignment.Center
     label.Text="" label.TextColor3=Settings.Color label.Parent=nameGui
+    local hpBG=Instance.new("Frame")
+    hpBG.Size=UDim2.new(0,120,0,6) hpBG.Position=UDim2.new(0.5,-60,1,-8)
+    hpBG.BackgroundColor3=Color3.fromRGB(20,20,25) hpBG.BorderSizePixel=0 hpBG.Active=false hpBG.Visible=false hpBG.Parent=nameGui
+    do local hpBGC=Instance.new("UICorner") hpBGC.CornerRadius=UDim.new(0,3) hpBGC.Parent=hpBG end
+    local hpFill=Instance.new("Frame")
+    hpFill.Size=UDim2.new(1,0,1,0) hpFill.BackgroundColor3=Color3.fromRGB(80,255,120)
+    hpFill.BorderSizePixel=0 hpFill.Active=false hpFill.Parent=hpBG
     local cham=Instance.new("Highlight")
     cham.Name="NovaCham" cham.Adornee=char cham.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
     cham.FillColor=Settings.Color cham.OutlineColor=Settings.Color
@@ -1593,7 +1621,7 @@ local function createESP(player)
     local tracer=Instance.new("Frame")
     tracer.AnchorPoint=Vector2.new(0.5,0.5) tracer.BorderSizePixel=0 tracer.Active=false
     tracer.BackgroundColor3=Settings.Color tracer.Visible=false tracer.Parent=overlayGui
-    ESPData[player]={boxGui=boxGui,stroke=stroke,nameGui=nameGui,nameLabel=label,parts=parts,hrp=hrp,hum=hum,tracer=tracer,cham=cham}
+    ESPData[player]={boxGui=boxGui,stroke=stroke,nameGui=nameGui,nameLabel=label,parts=parts,hrp=hrp,hum=hum,tracer=tracer,cham=cham,hpBG=hpBG,hpFill=hpFill}
     creating[player]=nil
 end
 
@@ -1617,6 +1645,7 @@ end
 local function hideOverlay(d)
     if not d then return end
     if d.tracer then d.tracer.Visible=false end
+    if d.hpBG then d.hpBG.Visible=false end
 end
 
 local rayParams=RaycastParams.new() rayParams.FilterType=Enum.RaycastFilterType.Exclude rayParams.IgnoreWater=true
@@ -1691,7 +1720,7 @@ local function findTarget(cam,mousePos,myHrp)
                         if ok then
                             local sd=screenDist(sp.X,sp.Y,mousePos.X,mousePos.Y)
                             if sd<=Settings.FOV then
-                                table.insert(cands,{sd=sd,hp=d.hum.Health,wp=wp,char=char,pl=player})
+                                table.insert(cands,{sd=sd,hp=d.hum.Health,wp=wp,char=char,pl=player,vl=d.hrp.AssemblyLinearVelocity})
                             end
                         end
                     end
@@ -1706,11 +1735,19 @@ local function findTarget(cam,mousePos,myHrp)
         table.sort(cands,function(a,b) return a.sd<b.sd end)
     end
     for i=1,math.min(3,#cands) do
-        if isVisible(cam,cands[i].char,cands[i].wp) then return cands[i].wp, cands[i].pl end
+        if isVisible(cam,cands[i].char,cands[i].wp) then return cands[i].wp, cands[i].pl, cands[i].vl end
     end
     return nil
 end
 
+local trigState, lastTrigMsgW = "off", 0
+local function setTrigState(s, nowC)
+    trigState = s
+    if trigMsgLbl and nowC - lastTrigMsgW > 0.2 then
+        lastTrigMsgW = nowC
+        pcall(function() trigMsgLbl.Text = "status: " .. s end)
+    end
+end
 local function doTrigger(cam, mousePos, mouseRaw, myHrp, nowC)
     local showDot=false
     if not ESP_ONLY and Settings.TrigEnabled and not Unloaded and myHrp then
@@ -1749,23 +1786,27 @@ local function doTrigger(cam, mousePos, mouseRaw, myHrp, nowC)
             end
             if valid then
                 showDot=true
-                if trigAcquireT==0 then trigAcquireT=nowC end
+                if trigAcquireT==0 then trigAcquireT=nowC setTrigState("locked", nowC) end
                 if nowC-trigAcquireT >= Settings.TrigDelay/1000 then
-                    if canClick then
-                        pcall(mouse1click)
-                        trigAcquireT=nowC
-                    elseif not trigWarned then
-                        trigWarned=true warn("[NOVA] triggerbot needs mouse1click (executor)")
+                    trigAcquireT=nowC
+                    local how=fireClick(mouseRaw.X, mouseRaw.Y)
+                    if how then setTrigState("firing ("..how..")", nowC)
+                    else
+                        setTrigState("NO CLICK API", nowC)
+                        if not trigWarned then trigWarned=true warn("[NOVA] triggerbot: no click method (mouse1click/VIM/tool)") end
                     end
                 end
             else
                 trigAcquireT=0
+                setTrigState("scanning", nowC)
             end
         else
             trigAcquireT=0
+            setTrigState("hold key...", nowC)
         end
     else
         trigAcquireT=0
+        setTrigState("off", nowC)
     end
     if trigDot then
         if showDot and Settings.TrigIndicator then
@@ -1859,7 +1900,7 @@ renderConn=track(RunService.RenderStepped:Connect(function()
                 if show and Settings.TeamCheck and player.Team~=nil and myTeam~=nil and player.Team==myTeam then show=false end
                 local okP = pcall(function()
                     d.boxGui.Enabled=show and boxesOn
-                    d.nameGui.Enabled=show and (Settings.Names or Settings.Distance)
+                    d.nameGui.Enabled=show and (Settings.Names or Settings.Distance or Settings.HealthBar)
                     if d.stroke.Color~=col then d.stroke.Color=col end
                     if d.cham then
                         if d.cham.FillColor~=col then d.cham.FillColor=col end
@@ -1870,9 +1911,15 @@ renderConn=track(RunService.RenderStepped:Connect(function()
                         local nt=buildLabelText(player, hrp, myHrp)
                         if d.nameLabel.Text~=nt then d.nameLabel.Text=nt end
                         if d.nameLabel.TextColor3~=col then d.nameLabel.TextColor3=col end
+                        if Settings.HealthBar and d.hpFill then
+                            local frac=math.clamp(hum.Health/math.max(1,hum.MaxHealth),0,1)
+                            d.hpFill.Size=UDim2.new(frac,0,1,0)
+                            d.hpFill.BackgroundColor3=Color3.fromRGB(math.floor(255*(1-frac)),math.floor(255*frac),60)
+                        end
                     elseif show and d.nameLabel.TextColor3~=col then
                         d.nameLabel.TextColor3=col
                     end
+                    if d.hpBG then d.hpBG.Visible=show and Settings.HealthBar end
                     if not show then
                         hideOverlay(d)
                     elseif doOverlay then
@@ -1906,7 +1953,7 @@ renderConn=track(RunService.RenderStepped:Connect(function()
         else wantAim=isAimHeld() end
     end
     if wantAim and myHrp then
-        local bestPos=nil
+        local bestPos, lockVel = nil, nil
         if Settings.AimLock and lockedPlayer~=nil then
             local ld=ESPData[lockedPlayer]
             local lch=lockedPlayer.Character
@@ -1916,15 +1963,19 @@ renderConn=track(RunService.RenderStepped:Connect(function()
                     local sp,vis=cam:WorldToViewportPoint(wp)
                     if vis and screenDist(sp.X,sp.Y,mousePos.X,mousePos.Y) <= Settings.FOV*1.5 then
                         bestPos=wp
+                        pcall(function() lockVel=ld.hrp.AssemblyLinearVelocity end)
                     end
                 end
             end
             if bestPos==nil then lockedPlayer=nil end
         end
         if bestPos==nil then
-            local wp,pl=findTarget(cam,mousePos,myHrp)
-            bestPos=wp
+            local wp,pl,vl=findTarget(cam,mousePos,myHrp)
+            bestPos=wp lockVel=vl
             if Settings.AimLock then lockedPlayer=pl end
+        end
+        if bestPos and Settings.Prediction>0 and typeof(lockVel)=="Vector3" then
+            bestPos=bestPos+lockVel*(Settings.Prediction*0.01)
         end
         if bestPos then
             if Settings.AimMethod=="Snap" then cam.CFrame=CFrame.new(cam.CFrame.Position,bestPos)
