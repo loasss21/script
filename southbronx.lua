@@ -105,6 +105,13 @@ local aimingOn = false
 local lastTrig = 0
 local fpsAcc, fpsShown, fpsClock = 0, 60, os.clock()
 local openDropClose = nil
+-- runtime caches: avoid per-frame GetPlayers() alloc + per-label Backpack scans
+local cachedPlayers = {}
+local function refreshPlayers() cachedPlayers = Players:GetPlayers() end
+refreshPlayers()
+local downCache = {}
+local invCache = {}
+local DOWN_TTL, INV_TTL = 0.25, 1.0
 
 local genv = nil
 pcall(function() genv = getgenv() end)
@@ -1248,6 +1255,9 @@ local function clearESP(player)
     end
     lastAttempt[player]=nil
     creating[player]=nil
+    invCache[player]=nil
+    local ch=nil pcall(function() ch=player.Character end)
+    if ch then downCache[ch]=nil end
 end
 
 local function Unload()
@@ -1255,11 +1265,39 @@ local function Unload()
     activeDragFn=nil aimingOn=false openDropClose=nil
     for _,c in ipairs(Conns) do pcall(function() c:Disconnect() end) end
     for p,_ in pairs(ESPData) do clearESP(p) end
-    for _,p in ipairs(Players:GetPlayers()) do if p.Character then deepCleanCharacter(p.Character) end end
+    for _,p in ipairs(cachedPlayers) do if p.Character then deepCleanCharacter(p.Character) end end
     pcall(function() overlayGui:Destroy() end) pcall(function() fovGui:Destroy() end) pcall(function() gui:Destroy() end)
 end
 unloadBtn.MouseButton1Click:Connect(Unload)
 
+local function getInvStr(player)
+    local nowC = os.clock()
+    local e = invCache[player]
+    if e and nowC - e.t < INV_TTL then return e.s end
+    local inv={}
+    pcall(function()
+        local bp=player:FindFirstChildOfClass("Backpack")
+        if bp then
+            for _,t in ipairs(bp:GetChildren()) do
+                if t:IsA("Tool") then table.insert(inv, t.Name) end
+            end
+        end
+        local ch=player.Character
+        if ch then
+            for _,t in ipairs(ch:GetChildren()) do
+                if t:IsA("Tool") then table.insert(inv, "[E] "..t.Name) end
+            end
+        end
+    end)
+    local s=""
+    if #inv>0 then
+        local shown=table.concat(inv, ", ", 1, math.min(#inv, 4))
+        if #inv>4 then shown=shown.." +"..(#inv-4) end
+        s="["..shown.."]"
+    end
+    invCache[player]={t=nowC, s=s}
+    return s
+end
 local function buildLabelText(player, hrp, myHrp)
     local txt=""
     if Settings.Names then txt=player.DisplayName.." (@"..player.Name..")" end
@@ -1272,26 +1310,10 @@ local function buildLabelText(player, hrp, myHrp)
         txt=txt..sub
     end
     if Settings.Inventory then
-        local inv={}
-        pcall(function()
-            local bp=player:FindFirstChildOfClass("Backpack")
-            if bp then
-                for _,t in ipairs(bp:GetChildren()) do
-                    if t:IsA("Tool") then table.insert(inv, t.Name) end
-                end
-            end
-            local ch=player.Character
-            if ch then
-                for _,t in ipairs(ch:GetChildren()) do
-                    if t:IsA("Tool") then table.insert(inv, "[E] "..t.Name) end
-                end
-            end
-        end)
-        if #inv>0 then
-            local shown=table.concat(inv, ", ", 1, math.min(#inv, 4))
-            if #inv>4 then shown=shown.." +"..(#inv-4) end
+        local s=getInvStr(player)
+        if s~="" then
             if txt~="" then txt=txt.."\n" end
-            txt=txt.."["..shown.."]"
+            txt=txt..s
         end
     end
     return txt
@@ -1308,6 +1330,14 @@ local function isDown(char, hum)
         end
     end
     return false
+end
+local function isDownCached(char, hum)
+    local nowC=os.clock()
+    local e=downCache[char]
+    if e and nowC-e.t < DOWN_TTL then return e.v end
+    local v=isDown(char, hum)
+    downCache[char]={t=nowC, v=v}
+    return v
 end
 
 local function createESP(player)
@@ -1407,7 +1437,7 @@ local function candidateOK(player, d, char)
     if d.hum.Health<=0 then return false end
     if not char then return false end
     if Settings.AimTeamCheck and player.Team and LocalPlayer.Team and player.Team==LocalPlayer.Team then return false end
-    if Settings.NoKnock and isDown(char, d.hum) then return false end
+    if Settings.NoKnock and isDownCached(char, d.hum) then return false end
     return true
 end
 local function getAimPos(parts,cam,mousePos)
@@ -1433,7 +1463,7 @@ end
 local function findTarget(cam,mousePos,myHrp)
     local cands={}
     local maxD2=Settings.MaxDistance*Settings.MaxDistance
-    for _,player in ipairs(Players:GetPlayers()) do
+    for _,player in ipairs(cachedPlayers) do
         if player~=LocalPlayer then
             local d=ESPData[player]
             local char=player.Character
@@ -1478,13 +1508,14 @@ for _,p in ipairs(Players:GetPlayers()) do
     end
 end
 track(Players.PlayerAdded:Connect(function(p)
+    refreshPlayers()
     track(p.CharacterAdded:Connect(function()
         if runStale() then return end
         if not LoadingDone or Unloaded then return end
         clearESP(p) task.wait(1) if LoadingDone and not Unloaded and not runStale() then createESP(p) end
     end))
 end))
-track(Players.PlayerRemoving:Connect(function(p) clearESP(p) end))
+track(Players.PlayerRemoving:Connect(function(p) clearESP(p) refreshPlayers() end))
 track(LocalPlayer.Idled:Connect(function()
     if Settings.AFKProtect and not Unloaded and not runStale() then
         pcall(function()
@@ -1522,8 +1553,8 @@ renderConn=track(RunService.RenderStepped:Connect(function()
     local myChar=LocalPlayer.Character
     local myHrp=myChar and myChar:FindFirstChild("HumanoidRootPart")
     local myTeam=LocalPlayer.Team
-    local scrW, scrH = overlayGui.AbsoluteSize.X, overlayGui.AbsoluteSize.Y
-    for _,player in ipairs(Players:GetPlayers()) do
+    local scrW, scrH = asz.X, asz.Y
+    for _,player in ipairs(cachedPlayers) do
         if player~=LocalPlayer then
             local d=ESPData[player]
             if d==nil then
@@ -1545,7 +1576,8 @@ renderConn=track(RunService.RenderStepped:Connect(function()
                     d.nameGui.Enabled=show and (Settings.Names or Settings.Distance)
                     if d.stroke.Color~=col then d.stroke.Color=col end
                     if show and doLabels then
-                        d.nameLabel.Text=buildLabelText(player, hrp, myHrp)
+                        local nt=buildLabelText(player, hrp, myHrp)
+                        if d.nameLabel.Text~=nt then d.nameLabel.Text=nt end
                         if d.nameLabel.TextColor3~=col then d.nameLabel.TextColor3=col end
                     elseif show and d.nameLabel.TextColor3~=col then
                         d.nameLabel.TextColor3=col
@@ -1569,7 +1601,7 @@ renderConn=track(RunService.RenderStepped:Connect(function()
     if nowC-fpsClock>=1 then
         fpsShown=fpsAcc fpsAcc=0 fpsClock=nowC
         pcall(function()
-            perfLbl.Text="FPS: "..fpsShown.." • Players: "..#Players:GetPlayers()
+            perfLbl.Text="FPS: "..fpsShown.." • Players: "..#cachedPlayers
         end)
     end
     if not ESP_ONLY and Settings.Trigger and nowC-lastTrig>0.12 then
@@ -1642,7 +1674,8 @@ local function finishLoading()
     print("[NOVA] v7.0 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
     pcall(function() loading:Destroy() end)
     pcall(function() main.Visible=true end)
-    for _,p in ipairs(Players:GetPlayers()) do
+    refreshPlayers()
+    for _,p in ipairs(cachedPlayers) do
         if p~=LocalPlayer and p.Character then task.spawn(createESP,p) end
     end
 end
