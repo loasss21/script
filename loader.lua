@@ -3,6 +3,7 @@
 -- If none exist, run nova.lua directly instead.
 
 local SB_UNIVERSE = 3734304510 -- South Bronx: The Trenches
+local SB_PLACES = { [10179538382] = true }
 local SB_URL = "https://raw.githubusercontent.com/loasss21/script/main/southbronx.lua"
 local UNI_URL = "https://raw.githubusercontent.com/loasss21/script/main/universal.lua"
 
@@ -21,6 +22,22 @@ end)
 if gethui then pcall(function() parentGui = gethui() end) end
 if not parentGui then
     warn("[NOVA] loader: no GUI parent, running blind")
+end
+
+-- clear stale loader GUIs from previous executions
+pcall(function() if parentGui then
+    for _,g in ipairs(parentGui:GetChildren()) do
+        if g.Name == "NovaLoader" then g:Destroy() end
+    end
+end end)
+
+-- mode handoff: getgenv when available, _G as fallback (scripts check both)
+local function setMode(m)
+    pcall(function()
+        local g = getgenv and getgenv()
+        if type(g) == "table" then g.NOVA_MODE = m end
+    end)
+    pcall(function() _G.NOVA_MODE = m end)
 end
 
 local statusLbl, barFill, loadGui, modeRow
@@ -79,18 +96,12 @@ if parentGui then
     hint.Font = Enum.Font.Gotham hint.TextSize = 11
     hint.TextColor3 = THEME_DIM hint.TextWrapped = true hint.Parent = frame
     btnESP.MouseButton1Click:Connect(function()
-        pcall(function()
-            local g = getgenv and getgenv()
-            if type(g) == "table" then g.NOVA_MODE = "esp" end
-        end)
+        setMode("esp")
         pcall(function() modeRow.Visible = false end)
         startRun("esp")
     end)
     btnFull.MouseButton1Click:Connect(function()
-        pcall(function()
-            local g = getgenv and getgenv()
-            if type(g) == "table" then g.NOVA_MODE = "full" end
-        end)
+        setMode("full")
         pcall(function() modeRow.Visible = false end)
         startRun("full")
     end)
@@ -130,19 +141,25 @@ end
 
 local function fail(msg)
     warn("[NOVA] loader failed: " .. msg .. " Run nova.lua directly instead.")
+    started = false -- allow retry via the mode buttons
     pcall(function()
-        statusLbl.Text = "failed: " .. msg
+        statusLbl.Text = "failed: " .. msg .. " (tap a mode to retry)"
         statusLbl.TextColor3 = Color3.fromRGB(255,120,120)
     end)
-    task.wait(4)
-    pcall(function() if loadGui then loadGui:Destroy() end end)
+    pcall(function() if modeRow then modeRow.Visible = true end end)
+end
+
+local function isSouthBronx()
+    local uni, place = 0, 0
+    pcall(function() uni = game.GameId end)
+    pcall(function() place = game.PlaceId end)
+    return uni == SB_UNIVERSE or SB_PLACES[place] == true
 end
 
 function startRun(mode)
     if started then return end
     started = true
-    local isSB = false
-    pcall(function() isSB = game.GameId == SB_UNIVERSE end)
+    local isSB = isSouthBronx()
     local url = isSB and SB_URL or UNI_URL
     local fname = isSB and "southbronx" or "universal"
     setStage("mode: " .. mode .. " • thinking...", 0.1)

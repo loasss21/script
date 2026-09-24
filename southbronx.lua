@@ -83,6 +83,7 @@ local ESP_ONLY = false
 pcall(function()
     local g = getgenv and getgenv()
     if type(g)=="table" and g.NOVA_MODE=="esp" then ESP_ONLY=true end
+    if _G.NOVA_MODE=="esp" then ESP_ONLY=true end
 end)
 
 local Unloaded = false
