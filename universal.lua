@@ -9,6 +9,7 @@ local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local VirtualUser = game:GetService("VirtualUser")
+local Lighting = game:GetService("Lighting")
 local LocalPlayer = Players.LocalPlayer
 
 print("[NOVA] v7.0 boot (single file)")
@@ -415,7 +416,7 @@ local function mkNavBtn(name, order)
     local s=Instance.new("UIStroke") s.Color=THEME.Stroke s.Thickness=1 s.Parent=b
     return b
 end
-local navESP=mkNavBtn("ESP",1) local navAim=mkNavBtn("Aimbot",2) local navMisc=mkNavBtn("Misc",3)
+local navESP=mkNavBtn("ESP",1) local navAim=mkNavBtn("Aimbot",2) local navMisc=mkNavBtn("Misc",3) local navUtil=mkNavBtn("Utility",4)
 
 local foot=Instance.new("Frame")
 foot.Size=UDim2.new(1,-14,0,60) foot.Position=UDim2.new(0,7,1,-66)
@@ -450,24 +451,25 @@ local function mkPage()
     pad.PaddingTop=UDim.new(0,2) pad.PaddingLeft=UDim.new(0,2) pad.PaddingRight=UDim.new(0,6) pad.PaddingBottom=UDim.new(0,12) pad.Parent=p
     return p
 end
-local espPage=mkPage() local aimPage=mkPage() local miscPage=mkPage()
-aimPage.Visible=false miscPage.Visible=false
+local espPage=mkPage() local aimPage=mkPage() local miscPage=mkPage() local utilPage=mkPage()
+aimPage.Visible=false miscPage.Visible=false utilPage.Visible=false
 
 local function paintNav(which)
     local function st(b,on)
         if on then b.BackgroundColor3=THEME.Accent b.TextColor3=Color3.new(1,1,1)
         else b.BackgroundColor3=THEME.Item b.TextColor3=THEME.TextDim end
     end
-    st(navESP,which=="ESP") st(navAim,which=="Aim") st(navMisc,which=="Misc")
+    st(navESP,which=="ESP") st(navAim,which=="Aim") st(navMisc,which=="Misc") st(navUtil,which=="Util")
 end
 local function setTab(w)
-    espPage.Visible=(w=="ESP") aimPage.Visible=(w=="Aim") miscPage.Visible=(w=="Misc")
-    espPage.CanvasPosition=Vector2.new(0,0) aimPage.CanvasPosition=Vector2.new(0,0) miscPage.CanvasPosition=Vector2.new(0,0)
+    espPage.Visible=(w=="ESP") aimPage.Visible=(w=="Aim") miscPage.Visible=(w=="Misc") utilPage.Visible=(w=="Util")
+    espPage.CanvasPosition=Vector2.new(0,0) aimPage.CanvasPosition=Vector2.new(0,0) miscPage.CanvasPosition=Vector2.new(0,0) utilPage.CanvasPosition=Vector2.new(0,0)
     paintNav(w)
 end
 navESP.MouseButton1Click:Connect(function() setTab("ESP") end)
 navAim.MouseButton1Click:Connect(function() setTab("Aim") end)
 navMisc.MouseButton1Click:Connect(function() setTab("Misc") end)
+navUtil.MouseButton1Click:Connect(function() setTab("Util") end)
 setTab("ESP")
 if ESP_ONLY then navAim.Visible=false end
 
@@ -816,6 +818,143 @@ end
 createSlider(aimPage,a,"MaxDistance","Max Distance",100,5000,Settings.MaxDistance,function(v) Settings.MaxDistance=v end) a=a+1
 end -- aim tab
 
+-- UTILITY STATE + LOOPS (movement, world)
+local Util = {WalkSpeed=16, JumpPower=50, InfJump=false, Fly=false, FlySpeed=60,
+    Noclip=false, Fullbright=false, CamFOV=70, ClickTP=false}
+local origLight = nil
+local lastUtilSync = 0
+
+local function stopFly()
+    local char=LocalPlayer.Character
+    local hrp=char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then pcall(function() hrp.Anchored=false end) end
+end
+
+local function setFullbright(on)
+    if on then
+        if not origLight then
+            origLight={}
+            pcall(function()
+                origLight.Brightness=Lighting.Brightness
+                origLight.Ambient=Lighting.Ambient
+                origLight.OutdoorAmbient=Lighting.OutdoorAmbient
+                origLight.FogEnd=Lighting.FogEnd
+                origLight.GlobalShadows=Lighting.GlobalShadows
+            end)
+        end
+        pcall(function()
+            Lighting.Brightness=2
+            Lighting.Ambient=Color3.new(1,1,1)
+            Lighting.OutdoorAmbient=Color3.new(1,1,1)
+            Lighting.FogEnd=100000
+            Lighting.GlobalShadows=false
+        end)
+    elseif origLight then
+        pcall(function()
+            Lighting.Brightness=origLight.Brightness
+            Lighting.Ambient=origLight.Ambient
+            Lighting.OutdoorAmbient=origLight.OutdoorAmbient
+            Lighting.FogEnd=origLight.FogEnd
+            Lighting.GlobalShadows=origLight.GlobalShadows
+        end)
+    end
+end
+
+local function fpsBoost()
+    pcall(function()
+        Lighting.GlobalShadows=false
+        for _,d in ipairs(Workspace:GetDescendants()) do
+            if d:IsA("BasePart") then
+                d.Material=Enum.Material.SmoothPlastic
+                d.CastShadow=false
+            elseif d:IsA("Decal") or d:IsA("Texture") then
+                d.Transparency=1
+            elseif d:IsA("ParticleEmitter") or d:IsA("Trail") or d:IsA("Beam")
+                or d:IsA("Fire") or d:IsA("Smoke") or d:IsA("Sparkles") then
+                d.Enabled=false
+            end
+        end
+    end)
+    notify("Utility", "fps boost applied")
+end
+
+track(RunService.Heartbeat:Connect(function(dt)
+    if Unloaded or runStale() then return end
+    if not Util.Fly then return end
+    local char=LocalPlayer.Character
+    local hrp=char and char:FindFirstChild("HumanoidRootPart")
+    local cam=Workspace.CurrentCamera
+    if not hrp or not cam then return end
+    dt=dt or 0.016
+    pcall(function()
+        hrp.Anchored=true
+        hrp.AssemblyLinearVelocity=Vector3.new()
+        hrp.AssemblyAngularVelocity=Vector3.new()
+        local cf=cam.CFrame
+        local move=Vector3.new()
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move=move+cf.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move=move-cf.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move=move-cf.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move=move+cf.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move=move+Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.C) then move=move-Vector3.new(0,1,0) end
+        if move.Magnitude>0.01 then move=move.Unit end
+        hrp.CFrame=hrp.CFrame+move*Util.FlySpeed*math.min(dt,0.1)
+    end)
+end))
+track(RunService.Stepped:Connect(function()
+    if Unloaded or runStale() then return end
+    if not Util.Noclip then return end
+    local char=LocalPlayer.Character
+    if not char then return end
+    for _,p in ipairs(char:GetDescendants()) do
+        if p:IsA("BasePart") then p.CanCollide=false end
+    end
+end))
+track(RunService.Heartbeat:Connect(function()
+    if Unloaded or runStale() then return end
+    local nowC=os.clock()
+    if nowC-lastUtilSync < 0.5 then return end
+    lastUtilSync=nowC
+    local hum=LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if hum then
+        pcall(function()
+            if hum.WalkSpeed~=Util.WalkSpeed then hum.WalkSpeed=Util.WalkSpeed end
+            if hum.UseJumpPower and hum.JumpPower~=Util.JumpPower then hum.JumpPower=Util.JumpPower end
+        end)
+    end
+    local cam=Workspace.CurrentCamera
+    if cam and cam.FieldOfView~=Util.CamFOV then
+        pcall(function() cam.FieldOfView=Util.CamFOV end)
+    end
+end))
+track(UserInputService.JumpRequest:Connect(function()
+    if Unloaded or runStale() then return end
+    if not Util.InfJump then return end
+    local hum=LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if hum then pcall(function() hum:ChangeState(Enum.HumanoidStateType.Jumping) end) end
+end))
+do
+    local okM, utilMouse = pcall(function() return LocalPlayer:GetMouse() end)
+    if okM and utilMouse then
+        track(utilMouse.Button1Down:Connect(function()
+            if Unloaded or runStale() then return end
+            if not Util.ClickTP then return end
+            local ctrl=false
+            pcall(function()
+                ctrl=UserInputService:IsKeyDown(Enum.KeyCode.LeftControl)
+                    or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)
+            end)
+            if not ctrl then return end
+            local hrp=LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp and utilMouse.Hit then
+                pcall(function() hrp.CFrame=CFrame.new(utilMouse.Hit.Position+Vector3.new(0,3,0)) end)
+                notify("Utility", "teleported")
+            end
+        end))
+    end
+end
+
 -- MISC TAB
 local mo=1
 pageHeader(miscPage,mo,"Misc") mo=mo+1
@@ -907,6 +1046,9 @@ function saveConfig()
         Target=Settings.Target, Priority=Settings.Priority, AimTeamCheck=Settings.AimTeamCheck,
         WallCheck=Settings.WallCheck, NoKnock=Settings.NoKnock, Trigger=Settings.Trigger, AFKProtect=Settings.AFKProtect,
         MaxDistance=Settings.MaxDistance,
+        WalkSpeed=Util.WalkSpeed, JumpPower=Util.JumpPower, InfJump=Util.InfJump,
+        Fly=Util.Fly, FlySpeed=Util.FlySpeed, Noclip=Util.Noclip,
+        Fullbright=Util.Fullbright, CamFOV=Util.CamFOV, ClickTP=Util.ClickTP,
         AimKey=keyToSave(Settings.AimKey), PanicKey=keyToSave(Settings.PanicKey), MenuKey=keyToSave(Settings.MenuKey),
     }
     local nm=cfgCleanName(cfgNameBox and cfgNameBox.Text or "")
@@ -927,7 +1069,8 @@ function loadConfig()
     end
     for _, id in ipairs({"ESPEnabled","Boxes","Names","Distance","TeamCheck","MaxESP","OverlayY","Inventory","Tracers",
         "AimEnabled","AimMethod","AimMode","FOV","ShowFOV","Smoothing","Target","Priority",
-        "AimTeamCheck","WallCheck","NoKnock","Trigger","AFKProtect","MaxDistance"}) do
+        "AimTeamCheck","WallCheck","NoKnock","Trigger","AFKProtect","MaxDistance",
+        "WalkSpeed","JumpPower","InfJump","Fly","FlySpeed","Noclip","Fullbright","CamFOV","ClickTP"}) do
         apply(id, data[id])
     end
     if type(data.Color)=="table" then
@@ -942,6 +1085,31 @@ function loadConfig()
     aimingOn=false
     cfgMsg.Text="loaded '"..nm.."'"
     notify("Config", "loaded '"..nm.."'")
+end
+
+-- UTILITY TAB (movement + world)
+local uo=1
+pageHeader(utilPage,uo,"Utility") uo=uo+1
+createSlider(utilPage,uo,"WalkSpeed","Walk Speed",16,250,Util.WalkSpeed,function(v) Util.WalkSpeed=v end) uo=uo+1
+createSlider(utilPage,uo,"JumpPower","Jump Power",50,500,Util.JumpPower,function(v) Util.JumpPower=v end) uo=uo+1
+createToggle(utilPage,uo,"InfJump","Infinite Jump",false,function(v) Util.InfJump=v end) uo=uo+1
+do local r=newRow(utilPage,uo); uo=uo+1
+    createToggle(r,1,"Fly","Fly",false,function(v) Util.Fly=v if not v then stopFly() end end,0.5,-3)
+    createToggle(r,2,"Noclip","Noclip",false,function(v) Util.Noclip=v end,0.5,-3)
+end
+createSlider(utilPage,uo,"FlySpeed","Fly Speed",16,200,Util.FlySpeed,function(v) Util.FlySpeed=v end) uo=uo+1
+do local r=newRow(utilPage,uo); uo=uo+1
+    createToggle(r,1,"Fullbright","Fullbright",false,function(v) Util.Fullbright=v setFullbright(v) end,0.5,-3)
+    createToggle(r,2,"ClickTP","Ctrl+Click TP",false,function(v) Util.ClickTP=v end,0.5,-3)
+end
+createSlider(utilPage,uo,"CamFOV","Camera FOV",30,120,Util.CamFOV,function(v) Util.CamFOV=v end) uo=uo+1
+do
+    local fb=Instance.new("TextButton")
+    fb.LayoutOrder=uo uo=uo+1 fb.Size=UDim2.new(1,-4,0,30) fb.Text="Apply FPS Boost"
+    fb.Font=Enum.Font.GothamBold fb.TextSize=13 fb.BackgroundColor3=THEME.Item
+    fb.TextColor3=Color3.new(1,1,1) fb.AutoButtonColor=false fb.Active=true fb.Parent=utilPage
+    local fbc=Instance.new("UICorner") fbc.CornerRadius=UDim.new(0,8) fbc.Parent=fb
+    fb.MouseButton1Click:Connect(function() fpsBoost() end)
 end
 
 local function clearESP(player)
@@ -961,6 +1129,8 @@ end
 local function Unload()
     if Unloaded then return end Unloaded=true
     activeDragFn=nil aimingOn=false openDropClose=nil
+    if Util.Fly then Util.Fly=false stopFly() end
+    if Util.Fullbright then Util.Fullbright=false setFullbright(false) end
     for _,c in ipairs(Conns) do pcall(function() c:Disconnect() end) end
     for p,_ in pairs(ESPData) do clearESP(p) end
     for _,p in ipairs(cachedPlayers) do if p.Character then deepCleanCharacter(p.Character) end end
