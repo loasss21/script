@@ -12,7 +12,7 @@ Roblox script: ESP / Aimbot / Misc / Utility (+ Farm-tab in South Bronx: The Tre
 
 ## Tabs
 
-ESP / Aimbot (sub-tabs: Aimbot + Triggerbot) / Misc / Utility (+ Farm in South Bronx).
+ESP (chams) / Aimbot (sub-tabs: Aimbot + Triggerbot, target lock) / Misc (server hop) / Utility (crosshair) / Arsenal-tab alleen in `arsenal.lua` (silent aim, gun mods, hitbox expander) / Farm-tab alleen in `southbronx.lua`.
 
 ## Usage (executor)
 

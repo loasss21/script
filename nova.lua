@@ -44,12 +44,12 @@ local THEME = {
 local Settings = {
     ESPEnabled = true, Boxes = true, Names = true, Distance = true,
     TeamCheck = false, MaxESP = 2000, OverlayY = 0,
-    Tracers = false, Inventory = false,
+    Tracers = false, Inventory = false, Chams = false,
     Color = Color3.fromRGB(255,0,0),
     AimEnabled = false, AimMethod = "Camera", AimMode = "Hold",
     AimKey = {Type="Mouse", Button=Enum.UserInputType.MouseButton2, Name="RMB"},
     FOV = 120, ShowFOV = true, Smoothing = 6,
-    Target = "Head", Priority = "Closest",
+    Target = "Head", Priority = "Closest", AimLock = false,
     AimTeamCheck = true, WallCheck = true, NoKnock = true,
     TrigEnabled = false, TrigMode = "Always", TrigTarget = "Any",
     TrigTeamCheck = true, TrigNoKnock = true, TrigDelay = 120, TrigIndicator = true,
@@ -108,6 +108,7 @@ local frameCount = 0
 local lastFOV = -1
 local aimingOn = false
 local trigAcquireT = 0
+local lockedPlayer = nil
 local fpsAcc, fpsShown, fpsClock = 0, 60, os.clock()
 local openDropClose = nil
 -- runtime caches: avoid per-frame GetPlayers() alloc + per-label Backpack scans
@@ -205,6 +206,18 @@ trigDot.AnchorPoint=Vector2.new(0.5,0.5) trigDot.Size=UDim2.new(0,8,0,8)
 trigDot.BackgroundColor3=Color3.fromRGB(80,255,120) trigDot.BorderSizePixel=0
 trigDot.Visible=false trigDot.Active=false trigDot.Parent=fovGui
 do local tdC=Instance.new("UICorner") tdC.CornerRadius=UDim.new(1,0) tdC.Parent=trigDot end
+local cross = {}
+do
+    local h = Instance.new("Frame")
+    h.AnchorPoint=Vector2.new(0.5,0.5) h.Size=UDim2.new(0,12,0,2)
+    h.BackgroundColor3=Color3.new(1,1,1) h.BorderSizePixel=0
+    h.Visible=false h.Active=false h.Parent=overlayGui
+    local v = Instance.new("Frame")
+    v.AnchorPoint=Vector2.new(0.5,0.5) v.Size=UDim2.new(0,2,0,12)
+    v.BackgroundColor3=Color3.new(1,1,1) v.BorderSizePixel=0
+    v.Visible=false v.Active=false v.Parent=overlayGui
+    cross.H, cross.V = h, v
+end
 
 local gui = Instance.new("ScreenGui")
 gui.Name="NovaHub" gui.ResetOnSpawn=false gui.DisplayOrder=999 gui.Parent=parentGui
@@ -673,7 +686,10 @@ do local r=newRow(espPage,o); o=o+1
     createToggle(r,1,"TeamCheck","Team Check",false,function(v) Settings.TeamCheck=v end,0.5,-3)
     createToggle(r,2,"Tracers","Tracers",false,function(v) Settings.Tracers=v end,0.5,-3)
 end
-createToggle(espPage,o,"Inventory","Inventory",Profile.inventoryDefault,function(v) Settings.Inventory=v end) o=o+1
+do local r=newRow(espPage,o); o=o+1
+    createToggle(r,1,"Inventory","Inventory",Profile.inventoryDefault,function(v) Settings.Inventory=v end,0.5,-3)
+    createToggle(r,2,"Chams","Chams",false,function(v) Settings.Chams=v end,0.5,-3)
+end
 createSlider(espPage,o,"MaxESP","Max ESP Dist",100,5000,Settings.MaxESP,function(v) Settings.MaxESP=v end) o=o+1
 createSlider(espPage,o,"OverlayY","Overlay Y-Shift",-100,100,Settings.OverlayY,function(v) Settings.OverlayY=v end) o=o+1
 
@@ -871,6 +887,7 @@ do local r=newRow(aimBotBox,ab); ab=ab+1
     createToggle(r,1,"AimTeamCheck","Team Check",true,function(v) Settings.AimTeamCheck=v end,0.5,-3)
     createToggle(r,2,"WallCheck","Wall Check",true,function(v) Settings.WallCheck=v end,0.5,-3)
 end
+createToggle(aimBotBox,ab,"AimLock","Target Lock",false,function(v) Settings.AimLock=v lockedPlayer=nil end) ab=ab+1
 createToggle(aimBotBox,ab,"NoKnock","No Knocked",true,function(v) Settings.NoKnock=v end) ab=ab+1
 createSlider(aimBotBox,ab,"MaxDistance","Max Distance",100,5000,Settings.MaxDistance,function(v) Settings.MaxDistance=v end) ab=ab+1
 local tc=1
@@ -897,7 +914,7 @@ end -- aim tab
 
 -- UTILITY STATE + LOOPS (movement, world)
 local Util = {WalkSpeed=16, JumpPower=50, InfJump=false, Fly=false, FlySpeed=60,
-    Noclip=false, Fullbright=false, CamFOV=70, ClickTP=false}
+    Noclip=false, Fullbright=false, CamFOV=70, ClickTP=false, Crosshair=false}
 local origLight = nil
 local lastUtilSync = 0
 
@@ -1125,6 +1142,7 @@ function saveConfig()
         TrigEnabled=Settings.TrigEnabled, TrigMode=Settings.TrigMode, TrigTarget=Settings.TrigTarget,
         TrigTeamCheck=Settings.TrigTeamCheck, TrigNoKnock=Settings.TrigNoKnock,
         TrigDelay=Settings.TrigDelay, TrigIndicator=Settings.TrigIndicator,
+        Chams=Settings.Chams, AimLock=Settings.AimLock, Crosshair=Util.Crosshair,
         MaxDistance=Settings.MaxDistance,
         WalkSpeed=Util.WalkSpeed, JumpPower=Util.JumpPower, InfJump=Util.InfJump,
         Fly=Util.Fly, FlySpeed=Util.FlySpeed, Noclip=Util.Noclip,
@@ -1151,6 +1169,7 @@ function loadConfig()
         "AimEnabled","AimMethod","AimMode","FOV","ShowFOV","Smoothing","Target","Priority",
         "AimTeamCheck","WallCheck","NoKnock","AFKProtect","MaxDistance",
         "TrigEnabled","TrigMode","TrigTarget","TrigTeamCheck","TrigNoKnock","TrigDelay","TrigIndicator",
+        "Chams","AimLock","Crosshair",
         "WalkSpeed","JumpPower","InfJump","Fly","FlySpeed","Noclip","Fullbright","CamFOV","ClickTP"}) do
         apply(id, data[id])
     end
@@ -1166,6 +1185,50 @@ function loadConfig()
     aimingOn=false
     cfgMsg.Text="loaded '"..nm.."'"
     notify("Config", "loaded '"..nm.."'")
+end
+
+do
+    local hop=Instance.new("TextButton")
+    hop.LayoutOrder=mo mo=mo+1 hop.Size=UDim2.new(1,-4,0,30) hop.Text="Server Hop"
+    hop.Font=Enum.Font.GothamBold hop.TextSize=13 hop.BackgroundColor3=THEME.Item
+    hop.TextColor3=Color3.new(1,1,1) hop.AutoButtonColor=false hop.Active=true hop.Parent=miscPage
+    local hopC=Instance.new("UICorner") hopC.CornerRadius=UDim.new(0,8) hopC.Parent=hop
+    hop.MouseButton1Click:Connect(function()
+        local function httpGetBody(url)
+            local req = (typeof(request)=="function" and request)
+                or (typeof(syn)=="table" and typeof(syn.request)=="function" and syn.request)
+                or (typeof(http_request)=="function" and http_request)
+                or (typeof(http)=="table" and typeof(http.request)=="function" and http.request)
+            if typeof(game.HttpGet)=="function" then
+                local ok, src = pcall(function() return game:HttpGet(url) end)
+                if ok and type(src)=="string" and src~="" then return src end
+            end
+            if req then
+                local ok, res = pcall(function() return req({Url=url, Method="GET"}) end)
+                if ok and res then
+                    if type(res)=="string" and res~="" then return res end
+                    if type(res)=="table" and type(res.Body)=="string" and res.Body~="" then return res.Body end
+                end
+            end
+            return nil
+        end
+        cfgMsg.Text="finding server..."
+        local body=httpGetBody("https://games.roblox.com/v1/games/"..tostring(game.PlaceId).."/servers/Public?sortOrder=Asc&limit=100")
+        if not body then cfgMsg.Text="hop failed: no http" return end
+        local ok, data = pcall(HttpService.JSONDecode, HttpService, body)
+        if not ok or type(data)~="table" or type(data.data)~="table" then cfgMsg.Text="hop failed: bad response" return end
+        local myJob=""
+        pcall(function() myJob=game.JobId end)
+        for _,s in ipairs(data.data) do
+            if type(s)=="table" and s.id and s.id~=myJob and (tonumber(s.playing) or 0) < (tonumber(s.maxPlayers) or 1) then
+                cfgMsg.Text="hopping..."
+                notify("Misc", "server hop...")
+                pcall(function() TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, LocalPlayer) end)
+                return
+            end
+        end
+        cfgMsg.Text="no open server found"
+    end)
 end
 
 -- UTILITY TAB (movement + world)
@@ -1184,6 +1247,7 @@ do local r=newRow(utilPage,uo); uo=uo+1
     createToggle(r,2,"ClickTP","Ctrl+Click TP",false,function(v) Util.ClickTP=v end,0.5,-3)
 end
 createSlider(utilPage,uo,"CamFOV","Camera FOV",30,120,Util.CamFOV,function(v) Util.CamFOV=v end) uo=uo+1
+createToggle(utilPage,uo,"Crosshair","Crosshair",false,function(v) Util.Crosshair=v end) uo=uo+1
 do
     local fb=Instance.new("TextButton")
     fb.LayoutOrder=uo uo=uo+1 fb.Size=UDim2.new(1,-4,0,30) fb.Text="Apply FPS Boost"
@@ -1198,6 +1262,7 @@ local function clearESP(player)
     if d then
         pcall(function() d.boxGui:Destroy() end) pcall(function() d.nameGui:Destroy() end)
         pcall(function() if d.tracer then d.tracer:Destroy() end end)
+        pcall(function() if d.cham then d.cham:Destroy() end end)
         ESPData[player]=nil
     end
     lastAttempt[player]=nil
@@ -1319,6 +1384,11 @@ local function createESP(player)
     label.Font=Enum.Font.GothamBold label.TextSize=13 label.TextStrokeTransparency=0
     label.TextXAlignment=Enum.TextXAlignment.Center
     label.Text="" label.TextColor3=Settings.Color label.Parent=nameGui
+    local cham=Instance.new("Highlight")
+    cham.Name="NovaCham" cham.Adornee=char cham.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+    cham.FillColor=Settings.Color cham.OutlineColor=Settings.Color
+    cham.FillTransparency=0.5 cham.OutlineTransparency=0 cham.Enabled=false cham.Parent=char
+    pcall(function() cham:SetAttribute("nx",1) end)
     local myHrp0=LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     label.Text=buildLabelText(player, hrp, myHrp0)
     -- (health bar removed)
@@ -1329,7 +1399,7 @@ local function createESP(player)
     local tracer=Instance.new("Frame")
     tracer.AnchorPoint=Vector2.new(0.5,0.5) tracer.BorderSizePixel=0 tracer.Active=false
     tracer.BackgroundColor3=Settings.Color tracer.Visible=false tracer.Parent=overlayGui
-    ESPData[player]={boxGui=boxGui,stroke=stroke,nameGui=nameGui,nameLabel=label,parts=parts,hrp=hrp,hum=hum,tracer=tracer}
+    ESPData[player]={boxGui=boxGui,stroke=stroke,nameGui=nameGui,nameLabel=label,parts=parts,hrp=hrp,hum=hum,tracer=tracer,cham=cham}
     creating[player]=nil
 end
 
@@ -1427,7 +1497,7 @@ local function findTarget(cam,mousePos,myHrp)
                         if ok then
                             local sd=screenDist(sp.X,sp.Y,mousePos.X,mousePos.Y)
                             if sd<=Settings.FOV then
-                                table.insert(cands,{sd=sd,hp=d.hum.Health,wp=wp,char=char})
+                                table.insert(cands,{sd=sd,hp=d.hum.Health,wp=wp,char=char,pl=player})
                             end
                         end
                     end
@@ -1442,7 +1512,7 @@ local function findTarget(cam,mousePos,myHrp)
         table.sort(cands,function(a,b) return a.sd<b.sd end)
     end
     for i=1,math.min(3,#cands) do
-        if isVisible(cam,cands[i].char,cands[i].wp) then return cands[i].wp end
+        if isVisible(cam,cands[i].char,cands[i].wp) then return cands[i].wp, cands[i].pl end
     end
     return nil
 end
@@ -1565,6 +1635,13 @@ renderConn=track(RunService.RenderStepped:Connect(function()
         end
         fovCircle.Position=UDim2.new(0,mouseRaw.X,0,mouseRaw.Y)
     else fovCircle.Visible=false end
+    if Util.Crosshair then
+        cross.H.Visible=true cross.V.Visible=true
+        cross.H.Position=UDim2.new(0,mouseRaw.X,0,mouseRaw.Y)
+        cross.V.Position=UDim2.new(0,mouseRaw.X,0,mouseRaw.Y)
+    else
+        cross.H.Visible=false cross.V.Visible=false
+    end
     local myChar=LocalPlayer.Character
     local myHrp=myChar and myChar:FindFirstChild("HumanoidRootPart")
     local myTeam=LocalPlayer.Team
@@ -1590,6 +1667,11 @@ renderConn=track(RunService.RenderStepped:Connect(function()
                     d.boxGui.Enabled=show and boxesOn
                     d.nameGui.Enabled=show and (Settings.Names or Settings.Distance)
                     if d.stroke.Color~=col then d.stroke.Color=col end
+                    if d.cham then
+                        if d.cham.FillColor~=col then d.cham.FillColor=col end
+                        if d.cham.OutlineColor~=col then d.cham.OutlineColor=col end
+                        d.cham.Enabled=show and Settings.Chams
+                    end
                     if show and doLabels then
                         local nt=buildLabelText(player, hrp, myHrp)
                         if d.nameLabel.Text~=nt then d.nameLabel.Text=nt end
@@ -1630,7 +1712,26 @@ renderConn=track(RunService.RenderStepped:Connect(function()
         else wantAim=isAimHeld() end
     end
     if wantAim and myHrp then
-        local bestPos=findTarget(cam,mousePos,myHrp)
+        local bestPos=nil
+        if Settings.AimLock and lockedPlayer~=nil then
+            local ld=ESPData[lockedPlayer]
+            local lch=lockedPlayer.Character
+            if candidateOK(lockedPlayer,ld,lch) then
+                local wp=getAimPos(ld.parts,cam,mousePos)
+                if wp then
+                    local sp,vis=cam:WorldToViewportPoint(wp)
+                    if vis and screenDist(sp.X,sp.Y,mousePos.X,mousePos.Y) <= Settings.FOV*1.5 then
+                        bestPos=wp
+                    end
+                end
+            end
+            if bestPos==nil then lockedPlayer=nil end
+        end
+        if bestPos==nil then
+            local wp,pl=findTarget(cam,mousePos,myHrp)
+            bestPos=wp
+            if Settings.AimLock then lockedPlayer=pl end
+        end
         if bestPos then
             if Settings.AimMethod=="Snap" then cam.CFrame=CFrame.new(cam.CFrame.Position,bestPos)
             elseif Settings.AimMethod=="Mouse" and hasMouseMove then
@@ -1643,6 +1744,8 @@ renderConn=track(RunService.RenderStepped:Connect(function()
                 cam.CFrame=cam.CFrame:Lerp(goal,math.clamp(1/math.max(1,Settings.Smoothing),0.05,1))
             end
         end
+    else
+        lockedPlayer=nil
     end
 end))
 
