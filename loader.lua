@@ -4,7 +4,10 @@
 
 local SB_UNIVERSE = 3734304510 -- South Bronx: The Trenches
 local SB_PLACES = { [10179538382] = true }
+local ARSENAL_UNIVERSE = 111958650 -- Arsenal by ROLVe
+local ARSENAL_PLACES = { [286090429] = true }
 local SB_URL = "https://raw.githubusercontent.com/loasss21/script/main/southbronx.lua"
+local ARS_URL = "https://raw.githubusercontent.com/loasss21/script/main/arsenal.lua"
 local UNI_URL = "https://raw.githubusercontent.com/loasss21/script/main/universal.lua"
 
 local THEME_BG = Color3.fromRGB(16,16,22)
@@ -156,12 +159,19 @@ local function isSouthBronx()
     return uni == SB_UNIVERSE or SB_PLACES[place] == true
 end
 
+local function isArsenal()
+    local uni, place = 0, 0
+    pcall(function() uni = game.GameId end)
+    pcall(function() place = game.PlaceId end)
+    return uni == ARSENAL_UNIVERSE or ARSENAL_PLACES[place] == true
+end
+
 function startRun(mode)
     if started then return end
     started = true
-    local isSB = isSouthBronx()
-    local url = isSB and SB_URL or UNI_URL
-    local fname = isSB and "southbronx" or "universal"
+    local url, fname = UNI_URL, "universal"
+    if isSouthBronx() then url, fname = SB_URL, "southbronx"
+    elseif isArsenal() then url, fname = ARS_URL, "arsenal" end
     setStage("mode: " .. mode .. " • thinking...", 0.1)
     task.wait(3)
     setStage("fetching " .. fname .. "...", 0.45)

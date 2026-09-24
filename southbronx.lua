@@ -49,7 +49,9 @@ local Settings = {
     AimKey = {Type="Mouse", Button=Enum.UserInputType.MouseButton2, Name="RMB"},
     FOV = 120, ShowFOV = true, Smoothing = 6,
     Target = "Head", Priority = "Closest",
-    AimTeamCheck = true, WallCheck = true, NoKnock = true, Trigger = false,
+    AimTeamCheck = true, WallCheck = true, NoKnock = true,
+    TrigEnabled = false, TrigMode = "Always", TrigTarget = "Any",
+    TrigTeamCheck = true, TrigNoKnock = true, TrigDelay = 120, TrigIndicator = true,
     MaxDistance = 1000, AFKProtect = true,
     PanicKey = {Type="Key", Key=Enum.KeyCode.Delete, Name="Delete"},
     MenuKey = {Type="Key", Key=Enum.KeyCode.RightShift, Name="RightShift"},
@@ -104,7 +106,7 @@ local trigWarned = false
 local frameCount = 0
 local lastFOV = -1
 local aimingOn = false
-local lastTrig = 0
+local trigAcquireT = 0
 local fpsAcc, fpsShown, fpsClock = 0, 60, os.clock()
 local openDropClose = nil
 -- runtime caches: avoid per-frame GetPlayers() alloc + per-label Backpack scans
@@ -197,6 +199,11 @@ local fovCircle = Instance.new("Frame")
 fovCircle.AnchorPoint=Vector2.new(0.5,0.5) fovCircle.BackgroundTransparency=1 fovCircle.Visible=false fovCircle.Active=false fovCircle.Parent=fovGui
 local fC = Instance.new("UICorner") fC.CornerRadius=UDim.new(1,0) fC.Parent=fovCircle
 local fS = Instance.new("UIStroke") fS.Thickness=1.5 fS.Color=Color3.new(1,1,1) fS.Transparency=0.15 fS.Parent=fovCircle
+local trigDot = Instance.new("Frame")
+trigDot.AnchorPoint=Vector2.new(0.5,0.5) trigDot.Size=UDim2.new(0,8,0,8)
+trigDot.BackgroundColor3=Color3.fromRGB(80,255,120) trigDot.BorderSizePixel=0
+trigDot.Visible=false trigDot.Active=false trigDot.Parent=fovGui
+do local tdC=Instance.new("UICorner") tdC.CornerRadius=UDim.new(1,0) tdC.Parent=trigDot end
 
 local gui = Instance.new("ScreenGui")
 gui.Name="NovaHub" gui.ResetOnSpawn=false gui.DisplayOrder=999 gui.Parent=parentGui
@@ -793,30 +800,99 @@ do
     end)
 end
 
--- AIMBOT TAB (skipped in ESP-only mode)
+-- AIM TAB with sub-tabs: Aimbot | Triggerbot (skipped in ESP-only mode)
 if not ESP_ONLY then
-local a=1
-pageHeader(aimPage,a,"Aimbot") a=a+1
-do local r=newRow(aimPage,a); a=a+1
+local aimSub = "bot"
+local aimBotBox = Instance.new("Frame")
+aimBotBox.BackgroundTransparency = 1
+aimBotBox.LayoutOrder = 2
+aimBotBox.Size = UDim2.new(1,-4,0,0)
+aimBotBox.AutomaticSize = Enum.AutomaticSize.Y
+aimBotBox.Parent = aimPage
+do local abbList = Instance.new("UIListLayout")
+abbList.Padding = UDim.new(0,6) abbList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+abbList.SortOrder = Enum.SortOrder.LayoutOrder abbList.Parent = aimBotBox
+end
+local trigBox = Instance.new("Frame")
+trigBox.BackgroundTransparency = 1
+trigBox.LayoutOrder = 3
+trigBox.Size = UDim2.new(1,-4,0,0)
+trigBox.AutomaticSize = Enum.AutomaticSize.Y
+trigBox.Visible = false
+trigBox.Parent = aimPage
+do local trbList = Instance.new("UIListLayout")
+trbList.Padding = UDim.new(0,6) trbList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+trbList.SortOrder = Enum.SortOrder.LayoutOrder trbList.Parent = trigBox
+end
+do local r = newRow(aimPage, 1)
+    local b1 = Instance.new("TextButton")
+    b1.LayoutOrder = 1 b1.Size = UDim2.new(0.5,-3,0,28)
+    b1.Text = "AIMBOT" b1.Font = Enum.Font.GothamBold b1.TextSize = 13
+    b1.AutoButtonColor = false b1.Active = true b1.Parent = r
+    local c1 = Instance.new("UICorner") c1.CornerRadius = UDim.new(0,8) c1.Parent = b1
+    local b2 = Instance.new("TextButton")
+    b2.LayoutOrder = 2 b2.Size = UDim2.new(0.5,-3,0,28)
+    b2.Text = "TRIGGER" b2.Font = Enum.Font.GothamBold b2.TextSize = 13
+    b2.AutoButtonColor = false b2.Active = true b2.Parent = r
+    local c2 = Instance.new("UICorner") c2.CornerRadius = UDim.new(0,8) c2.Parent = b2
+    local function paintSub()
+        if aimSub == "bot" then
+            b1.BackgroundColor3 = THEME.Accent b1.TextColor3 = Color3.new(1,1,1)
+            b2.BackgroundColor3 = THEME.Item b2.TextColor3 = THEME.TextDim
+        else
+            b2.BackgroundColor3 = THEME.Accent b2.TextColor3 = Color3.new(1,1,1)
+            b1.BackgroundColor3 = THEME.Item b1.TextColor3 = THEME.TextDim
+        end
+    end
+    local function showSub(w)
+        aimSub = w
+        aimBotBox.Visible = (w == "bot")
+        trigBox.Visible = (w == "trig")
+        paintSub()
+    end
+    b1.MouseButton1Click:Connect(function() showSub("bot") end)
+    b2.MouseButton1Click:Connect(function() showSub("trig") end)
+    paintSub()
+end
+local ab=1
+pageHeader(aimBotBox,ab,"Aimbot") ab=ab+1
+do local r=newRow(aimBotBox,ab); ab=ab+1
     createToggle(r,1,"AimEnabled","Aimbot",false,function(v) Settings.AimEnabled=v aimingOn=false end,0.5,-3)
     createToggle(r,2,"ShowFOV","Show FOV",true,function(v) Settings.ShowFOV=v end,0.5,-3)
 end
-createDropdown(aimPage,a,"AimMethod","Method",{"Camera","Mouse","Snap"},Settings.AimMethod,function(v) Settings.AimMethod=v end) a=a+1
-createDropdown(aimPage,a,"AimMode","Mode",{"Hold","Toggle"},Settings.AimMode,function(v) Settings.AimMode=v aimingOn=false end) a=a+1
-createKeyPicker(aimPage,a,"AimKey","Hold Key","RMB",function(d) Settings.AimKey=d aimingOn=false end) a=a+1
-createSlider(aimPage,a,"FOV","FOV",20,500,Settings.FOV,function(v) Settings.FOV=v end) a=a+1
-createSlider(aimPage,a,"Smoothing","Smoothing",1,20,Settings.Smoothing,function(v) Settings.Smoothing=v end) a=a+1
-createDropdown(aimPage,a,"Target","Target",{"Head","HRP","Closest"},Settings.Target,function(v) Settings.Target=v end) a=a+1
-createDropdown(aimPage,a,"Priority","Priority",{"Closest","Low HP"},Settings.Priority,function(v) Settings.Priority=v end) a=a+1
-do local r=newRow(aimPage,a); a=a+1
+createDropdown(aimBotBox,ab,"AimMethod","Method",{"Camera","Mouse","Snap"},Settings.AimMethod,function(v) Settings.AimMethod=v end) ab=ab+1
+createDropdown(aimBotBox,ab,"AimMode","Mode",{"Hold","Toggle"},Settings.AimMode,function(v) Settings.AimMode=v aimingOn=false end) ab=ab+1
+createKeyPicker(aimBotBox,ab,"AimKey","Hold Key","RMB",function(d) Settings.AimKey=d aimingOn=false end) ab=ab+1
+createSlider(aimBotBox,ab,"FOV","FOV",20,500,Settings.FOV,function(v) Settings.FOV=v end) ab=ab+1
+createSlider(aimBotBox,ab,"Smoothing","Smoothing",1,20,Settings.Smoothing,function(v) Settings.Smoothing=v end) ab=ab+1
+createDropdown(aimBotBox,ab,"Target","Target",{"Head","HRP","Closest"},Settings.Target,function(v) Settings.Target=v end) ab=ab+1
+createDropdown(aimBotBox,ab,"Priority","Priority",{"Closest","Low HP"},Settings.Priority,function(v) Settings.Priority=v end) ab=ab+1
+do local r=newRow(aimBotBox,ab); ab=ab+1
     createToggle(r,1,"AimTeamCheck","Team Check",true,function(v) Settings.AimTeamCheck=v end,0.5,-3)
     createToggle(r,2,"WallCheck","Wall Check",true,function(v) Settings.WallCheck=v end,0.5,-3)
 end
-do local r=newRow(aimPage,a); a=a+1
-    createToggle(r,1,"NoKnock","No Knocked",true,function(v) Settings.NoKnock=v end,0.5,-3)
-    createToggle(r,2,"Trigger","Triggerbot",false,function(v) Settings.Trigger=v end,0.5,-3)
+createToggle(aimBotBox,ab,"NoKnock","No Knocked",true,function(v) Settings.NoKnock=v end) ab=ab+1
+createSlider(aimBotBox,ab,"MaxDistance","Max Distance",100,5000,Settings.MaxDistance,function(v) Settings.MaxDistance=v end) ab=ab+1
+local tc=1
+pageHeader(trigBox,tc,"Triggerbot") tc=tc+1
+do local r=newRow(trigBox,tc); tc=tc+1
+    createToggle(r,1,"TrigEnabled","Triggerbot",false,function(v) Settings.TrigEnabled=v trigAcquireT=0 end,0.5,-3)
+    createToggle(r,2,"TrigIndicator","Indicator",true,function(v) Settings.TrigIndicator=v end,0.5,-3)
 end
-createSlider(aimPage,a,"MaxDistance","Max Distance",100,5000,Settings.MaxDistance,function(v) Settings.MaxDistance=v end) a=a+1
+createDropdown(trigBox,tc,"TrigMode","Mode",{"Always","Hold Key"},Settings.TrigMode,function(v) Settings.TrigMode=v trigAcquireT=0 end) tc=tc+1
+createDropdown(trigBox,tc,"TrigTarget","Hit Part",{"Any","Head","HRP"},Settings.TrigTarget,function(v) Settings.TrigTarget=v trigAcquireT=0 end) tc=tc+1
+do local r=newRow(trigBox,tc); tc=tc+1
+    createToggle(r,1,"TrigTeamCheck","Team Check",true,function(v) Settings.TrigTeamCheck=v end,0.5,-3)
+    createToggle(r,2,"TrigNoKnock","No Knocked",true,function(v) Settings.TrigNoKnock=v end,0.5,-3)
+end
+createSlider(trigBox,tc,"TrigDelay","Reaction Delay (ms)",0,500,Settings.TrigDelay,function(v) Settings.TrigDelay=v trigAcquireT=0 end) tc=tc+1
+do
+    local info=Instance.new("TextLabel")
+    info.LayoutOrder=tc tc=tc+1 info.Size=UDim2.new(1,-4,0,30)
+    info.BackgroundTransparency=1 info.Text="Fires when the crosshair is on a valid target."
+    info.Font=Enum.Font.Gotham info.TextSize=11 info.TextColor3=THEME.TextDim
+    info.TextWrapped=true info.Parent=trigBox
+end
 end -- aim tab
 
 -- FARM TAB (southbronx file only: movement, ATM/marsh farm, teleports)
@@ -1305,7 +1381,10 @@ function saveConfig()
         AimEnabled=Settings.AimEnabled, AimMethod=Settings.AimMethod, AimMode=Settings.AimMode,
         FOV=Settings.FOV, ShowFOV=Settings.ShowFOV, Smoothing=Settings.Smoothing,
         Target=Settings.Target, Priority=Settings.Priority, AimTeamCheck=Settings.AimTeamCheck,
-        WallCheck=Settings.WallCheck, NoKnock=Settings.NoKnock, Trigger=Settings.Trigger, AFKProtect=Settings.AFKProtect,
+        WallCheck=Settings.WallCheck, NoKnock=Settings.NoKnock, AFKProtect=Settings.AFKProtect,
+        TrigEnabled=Settings.TrigEnabled, TrigMode=Settings.TrigMode, TrigTarget=Settings.TrigTarget,
+        TrigTeamCheck=Settings.TrigTeamCheck, TrigNoKnock=Settings.TrigNoKnock,
+        TrigDelay=Settings.TrigDelay, TrigIndicator=Settings.TrigIndicator,
         MaxDistance=Settings.MaxDistance,
         WalkSpeed=Util.WalkSpeed, JumpPower=Util.JumpPower, InfJump=Util.InfJump,
         Fly=Util.Fly, FlySpeed=Util.FlySpeed, Noclip=Util.Noclip,
@@ -1330,7 +1409,8 @@ function loadConfig()
     end
     for _, id in ipairs({"ESPEnabled","Boxes","Names","Distance","TeamCheck","MaxESP","OverlayY","Inventory","Tracers",
         "AimEnabled","AimMethod","AimMode","FOV","ShowFOV","Smoothing","Target","Priority",
-        "AimTeamCheck","WallCheck","NoKnock","Trigger","AFKProtect","MaxDistance",
+        "AimTeamCheck","WallCheck","NoKnock","AFKProtect","MaxDistance",
+        "TrigEnabled","TrigMode","TrigTarget","TrigTeamCheck","TrigNoKnock","TrigDelay","TrigIndicator",
         "WalkSpeed","JumpPower","InfJump","Fly","FlySpeed","Noclip","Fullbright","CamFOV","ClickTP"}) do
         apply(id, data[id])
     end
@@ -1627,6 +1707,72 @@ local function findTarget(cam,mousePos,myHrp)
     return nil
 end
 
+local function doTrigger(cam, mousePos, mouseRaw, myHrp, nowC)
+    local showDot=false
+    if not ESP_ONLY and Settings.TrigEnabled and not Unloaded and myHrp then
+        local holdOK=true
+        if Settings.TrigMode=="Hold Key" then holdOK=isAimHeld() end
+        if holdOK then
+            local valid=false
+            local ray=cam:ViewportPointToRay(mousePos.X, mousePos.Y)
+            if ray then
+                rayParams.FilterDescendantsInstances={LocalPlayer.Character, cam}
+                local res=Workspace:Raycast(ray.Origin, ray.Direction*1000, rayParams)
+                if res and res.Instance then
+                    local hitModel=res.Instance:FindFirstAncestorOfClass("Model")
+                    local tp=hitModel and Players:GetPlayerFromCharacter(hitModel) or nil
+                    if tp and tp~=LocalPlayer then
+                        local ch=tp.Character
+                        local hum=ch and ch:FindFirstChildOfClass("Humanoid")
+                        if ch and hum and hum.Health>0 then
+                            valid=true
+                            if valid and Settings.TrigTeamCheck and tp.Team and LocalPlayer.Team and tp.Team==LocalPlayer.Team then valid=false end
+                            if valid and Settings.TrigNoKnock and isDownCached(ch, hum) then valid=false end
+                            if valid and Settings.TrigTarget=="Head" and res.Instance.Name~="Head" then valid=false end
+                            if valid and Settings.TrigTarget=="HRP" and res.Instance.Name~="HumanoidRootPart" then valid=false end
+                            if valid then
+                                local hp=ch:FindFirstChild("HumanoidRootPart")
+                                if hp then
+                                    local dx=myHrp.Position.X-hp.Position.X
+                                    local dy=myHrp.Position.Y-hp.Position.Y
+                                    local dz=myHrp.Position.Z-hp.Position.Z
+                                    if dx*dx+dy*dy+dz*dz > Settings.MaxDistance*Settings.MaxDistance then valid=false end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            if valid then
+                showDot=true
+                if trigAcquireT==0 then trigAcquireT=nowC end
+                if nowC-trigAcquireT >= Settings.TrigDelay/1000 then
+                    if canClick then
+                        pcall(mouse1click)
+                        trigAcquireT=nowC
+                    elseif not trigWarned then
+                        trigWarned=true warn("[NOVA] triggerbot needs mouse1click (executor)")
+                    end
+                end
+            else
+                trigAcquireT=0
+            end
+        else
+            trigAcquireT=0
+        end
+    else
+        trigAcquireT=0
+    end
+    if trigDot then
+        if showDot and Settings.TrigIndicator then
+            trigDot.Visible=true
+            pcall(function() trigDot.Position=UDim2.new(0,mouseRaw.X,0,mouseRaw.Y) end)
+        else
+            trigDot.Visible=false
+        end
+    end
+end
+
 for _,p in ipairs(Players:GetPlayers()) do
     if p~=LocalPlayer then
         track(p.CharacterAdded:Connect(function()
@@ -1733,33 +1879,10 @@ renderConn=track(RunService.RenderStepped:Connect(function()
             perfLbl.Text="FPS: "..fpsShown.." • Players: "..#cachedPlayers
         end)
     end
-    if not ESP_ONLY and Settings.Trigger and nowC-lastTrig>0.12 then
-        lastTrig=nowC
-        if canClick and myHrp then
-            local ray=cam:ViewportPointToRay(mousePos.X, mousePos.Y)
-            if ray then
-                rayParams.FilterDescendantsInstances={LocalPlayer.Character, cam}
-                local res=Workspace:Raycast(ray.Origin, ray.Direction*1000, rayParams)
-                if res and res.Instance then
-                    local hitModel=res.Instance:FindFirstAncestorOfClass("Model")
-                    local tp=hitModel and Players:GetPlayerFromCharacter(hitModel) or nil
-                    if tp and tp~=LocalPlayer then
-                        local d=ESPData[tp]
-                        local ch=tp.Character
-                        if candidateOK(tp, d, ch) then
-                            local hp0=d.hrp.Position
-                            local mhp0=myHrp.Position
-                            local dx=mhp0.X-hp0.X local dy=mhp0.Y-hp0.Y local dz=mhp0.Z-hp0.Z
-                            if dx*dx+dy*dy+dz*dz <= Settings.MaxDistance*Settings.MaxDistance then
-                                pcall(mouse1click)
-                            end
-                        end
-                    end
-                end
-            end
-        elseif not canClick and not trigWarned then
-            trigWarned=true warn("[NOVA] triggerbot needs mouse1click (executor)")
-        end
+    if doOverlay then
+        doTrigger(cam, mousePos, mouseRaw, myHrp, nowC)
+    elseif trigDot then
+        trigDot.Visible=false
     end
     local wantAim=false
     if not ESP_ONLY and Settings.AimEnabled and not Unloaded then

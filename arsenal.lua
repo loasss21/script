@@ -1,4 +1,4 @@
--- NOVA v7.0 SINGLE FILE | ESP / Aimbot / Misc (South Bronx auto-detect)
+-- NOVA v7.0 ARSENAL FILE | ESP / Aimbot / Utility (Arsenal by ROLVe)
 -- Menu: RightShift (drag via welcome header) • Panic default: Delete
 
 local Players = game:GetService("Players")
@@ -12,7 +12,7 @@ local VirtualUser = game:GetService("VirtualUser")
 local Lighting = game:GetService("Lighting")
 local LocalPlayer = Players.LocalPlayer
 
-print("[NOVA] v7.0 boot (single file)")
+print("[NOVA] v7.0 boot (arsenal file)")
 
 -- KEY SYSTEM: set true + put your keys in VALID_KEYS to lock the script
 local KeySystemEnabled = false
@@ -20,15 +20,13 @@ local VALID_KEYS = { ["CHANGE-ME"] = true }
 local KEY_FILE = "nova_key.txt"
 local MAX_KEY_TRIES = 5
 
--- GAME DETECTION: South Bronx: The Trenches vs everything else (Universal)
-local SOUTH_BRONX_UNIVERSE = 3734304510
-local SOUTH_BRONX_PLACES = { [10179538382] = true }
+-- GAME FILE: Arsenal build (hardcoded, no detection needed)
+local IS_SOUTH_BRONX = false
+local GAME_VERSION = "Arsenal"
+local FILE_TAG = "arsenal"
 local detectedUniverse, detectedPlace = 0, 0
 pcall(function() detectedUniverse = game.GameId end)
 pcall(function() detectedPlace = game.PlaceId end)
-local IS_SOUTH_BRONX = (detectedUniverse == SOUTH_BRONX_UNIVERSE) or (SOUTH_BRONX_PLACES[detectedPlace] == true)
-local GAME_VERSION = IS_SOUTH_BRONX and "South Bronx" or "Universal"
-local FILE_TAG = "single"
 
 print("[NOVA] v7.0 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
 
@@ -43,12 +41,12 @@ local THEME = {
 
 local Settings = {
     ESPEnabled = true, Boxes = true, Names = true, Distance = true,
-    TeamCheck = false, MaxESP = 2000, OverlayY = 0,
+    TeamCheck = true, MaxESP = 2000, OverlayY = 0,
     Tracers = false, Inventory = false,
     Color = Color3.fromRGB(255,0,0),
     AimEnabled = false, AimMethod = "Camera", AimMode = "Hold",
     AimKey = {Type="Mouse", Button=Enum.UserInputType.MouseButton2, Name="RMB"},
-    FOV = 120, ShowFOV = true, Smoothing = 6,
+    FOV = 100, ShowFOV = true, Smoothing = 4,
     Target = "Head", Priority = "Closest",
     AimTeamCheck = true, WallCheck = true, NoKnock = true,
     TrigEnabled = false, TrigMode = "Always", TrigTarget = "Any",
@@ -58,24 +56,15 @@ local Settings = {
     MenuKey = {Type="Key", Key=Enum.KeyCode.RightShift, Name="RightShift"},
 }
 
--- GAME PROFILE: South Bronx branch, nu nog gelijk aan Universal.
--- Later: hier SB-defaults zetten (bv. andere Target/Priority/MaxDistance,
--- extra knocked-vlaggen) zonder de rest van het script aan te raken.
+-- GAME PROFILE: Arsenal branch (team shooter defaults).
 local Profile = {
     version = GAME_VERSION,
     isSouthBronx = IS_SOUTH_BRONX,
     defaultTarget = "Head",
     defaultPriority = "Closest",
-    defaultMaxDistance = 1000,
+    defaultMaxDistance = 1500,
     inventoryDefault = false,
 }
-if IS_SOUTH_BRONX then
-    -- SB-specifiek: inventory-lijn standaard aan in South Bronx.
-    Profile.defaultTarget = "Head"
-    Profile.defaultPriority = "Closest"
-    Profile.defaultMaxDistance = 1000
-    Profile.inventoryDefault = true
-end
 Settings.Target = Profile.defaultTarget
 Settings.Priority = Profile.defaultPriority
 Settings.MaxDistance = Profile.defaultMaxDistance

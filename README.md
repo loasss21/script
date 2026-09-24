@@ -7,7 +7,12 @@ Roblox script: ESP / Aimbot / Misc / Utility (+ Farm-tab in South Bronx: The Tre
 - `loader.lua` — run this. Shows ESP ONLY / FULL choice, detects the game, pulls the right file.
 - `universal.lua` — main script (auto-detects South Bronx, no Farm tab).
 - `southbronx.lua` — South Bronx build, extra Farm tab (fly/noclip live in Utility).
+- `arsenal.lua` — Arsenal build (team-check on, faster smoothing, 1500m range).
 - `nova.lua` — offline mirror of `universal.lua`. Paste directly when HTTP is unavailable.
+
+## Tabs
+
+ESP / Aimbot (sub-tabs: Aimbot + Triggerbot) / Misc / Utility (+ Farm in South Bronx).
 
 ## Usage (executor)
 
