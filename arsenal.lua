@@ -48,7 +48,7 @@ local Settings = {
     AimEnabled = false, AimMethod = "Camera", AimMode = "Hold",
     AimKey = {Type="Mouse", Button=Enum.UserInputType.MouseButton2, Name="RMB"},
     FOV = 100, ShowFOV = true, Smoothing = 4,
-    Target = "Head", Priority = "Closest", AimLock = false, Prediction = 0,
+    Target = "Head", Priority = "Closest", AimLock = false, Prediction = 0, SilentChance = 100,
     AimTeamCheck = true, WallCheck = true, NoKnock = true,
     TrigEnabled = false, TrigMode = "Always", TrigTarget = "Any",
     TrigTeamCheck = true, TrigNoKnock = true, TrigDelay = 120,
@@ -896,12 +896,13 @@ do local r=newRow(aimBotBox,ab); ab=ab+1
     createToggle(r,1,"AimEnabled","Aimbot",false,function(v) Settings.AimEnabled=v aimingOn=false end,0.5,-3)
     createToggle(r,2,"ShowFOV","Show FOV",true,function(v) Settings.ShowFOV=v end,0.5,-3)
 end
-createDropdown(aimBotBox,ab,"AimMethod","Method",{"Camera","Mouse","Silent"},Settings.AimMethod,function(v) Settings.AimMethod=v if v=="Silent" then silentMouse.install(true) end end) ab=ab+1
+createDropdown(aimBotBox,ab,"AimMethod","Method",{"Camera","Mouse","Silent"},Settings.AimMethod,function(v) Settings.AimMethod=v if v=="Silent" then silentHooks.install(true) end end) ab=ab+1
 createDropdown(aimBotBox,ab,"AimMode","Mode",{"Hold","Toggle"},Settings.AimMode,function(v) Settings.AimMode=v aimingOn=false end) ab=ab+1
 createKeyPicker(aimBotBox,ab,"AimKey","Hold Key","RMB",function(d) Settings.AimKey=d aimingOn=false kb.refresh() end) ab=ab+1
 createSlider(aimBotBox,ab,"FOV","FOV",20,500,Settings.FOV,function(v) Settings.FOV=v end) ab=ab+1
 createSlider(aimBotBox,ab,"Smoothing","Smoothing",1,20,Settings.Smoothing,function(v) Settings.Smoothing=v end) ab=ab+1
 createSlider(aimBotBox,ab,"Prediction","Prediction",0,20,Settings.Prediction,function(v) Settings.Prediction=v end) ab=ab+1
+createSlider(aimBotBox,ab,"SilentChance","Silent Chance",10,100,Settings.SilentChance,function(v) Settings.SilentChance=v end) ab=ab+1
 createDropdown(aimBotBox,ab,"Target","Target",{"Head","HRP","Closest"},Settings.Target,function(v) Settings.Target=v end) ab=ab+1
 createDropdown(aimBotBox,ab,"Priority","Priority",{"Closest","Low HP"},Settings.Priority,function(v) Settings.Priority=v end) ab=ab+1
 do local r=newRow(aimBotBox,ab); ab=ab+1
@@ -1131,35 +1132,40 @@ local function getSilentTarget(cam, mousePos)
     return best
 end
 local function setSilentHook(on)
-    local function patchArsenalShot(remoteName, args, part)
-        local ok=false
-        if remoteName=="HitPart" then
-            pcall(function() args[1]=part ok=true end)
-        elseif remoteName=="Fire" then
-            pcall(function() args[1]=part.Position ok=true end)
-        elseif remoteName=="Trail" then
-            pcall(function()
-                if type(args[1])=="table" and type(args[1][5])=="string" then
-                    args[1][6]=part
-                    args[1][2]=part.Position
-                    ok=true
+    -- REMAKE: spec-driven patcher. Args are copied before patching so a
+    -- failed/unknown layout can never corrupt the real shot: fallthrough
+    -- always fires the pristine call.
+    local function patchShot(rname, src, n, part)
+        local p = {}
+        for i = 1, n do p[i] = src[i] end
+        local ok = false
+        pcall(function()
+            if rname=="HitPart" then
+                p[1]=part ok=true
+            elseif rname=="Fire" then
+                p[1]=part.Position ok=true
+            elseif rname=="Trail" then
+                if type(p[1])=="table" and type(p[1][5])=="string" then
+                    local t={}
+                    for k,v in pairs(p[1]) do t[k]=v end
+                    t[6]=part t[2]=part.Position
+                    p[1]=t ok=true
                 end
-            end)
-        elseif ARS.SilentProj and remoteName=="CreateProjectile" then
-            pcall(function()
-                args[18]=part args[19]=part.Position args[17]=part.Position
-                args[4]=part.CFrame args[10]=part.Position args[3]=part.Position
+            elseif ARS.SilentProj and rname=="CreateProjectile" then
+                p[3]=part.Position p[4]=part.CFrame p[10]=part.Position
+                p[17]=part.Position p[18]=part p[19]=part.Position
                 ok=true
-            end)
-        elseif ARS.SilentProj and remoteName=="ReplicateProjectile" then
-            pcall(function()
-                if type(args[1])=="table" then
-                    args[1][3]=part.Position args[1][4]=part.Position args[1][10]=part.Position
-                    ok=true
+            elseif ARS.SilentProj and rname=="ReplicateProjectile" then
+                if type(p[1])=="table" then
+                    local t={}
+                    for k,v in pairs(p[1]) do t[k]=v end
+                    t[3]=part.Position t[4]=part.Position t[10]=part.Position
+                    p[1]=t ok=true
                 end
-            end)
-        end
-        return ok
+            end
+        end)
+        if ok then return p, n end
+        return nil, 0
     end
     arsMsg(on and "silent aim: on" or "silent aim: off")
     if on and not silentHooked then
@@ -1183,10 +1189,11 @@ local function setSilentHook(on)
                                 local part=getSilentTarget(cam, silentMousePos())
                                 if part and math.random(100)<=ARS.SilentChance then
                                     local args={...}
-                                    if patchArsenalShot(rname, args, part) then
+                                    local patched, pn = patchShot(rname, args, select("#", ...), part)
+                                    if patched then
                                         ARS.SilentHits=(ARS.SilentHits or 0)+1
                                         ARS.SilentLast=os.clock()
-                                        return oldSilentCall(self, (table.unpack or unpack)(args))
+                                        return oldSilentCall(self, table.unpack(patched, 1, pn))
                                     end
                                 end
                             end
@@ -1401,7 +1408,7 @@ function saveConfig()
         TrigTeamCheck=Settings.TrigTeamCheck, TrigNoKnock=Settings.TrigNoKnock,
         TrigDelay=Settings.TrigDelay,
         Chams=Settings.Chams, AimLock=Settings.AimLock, Crosshair=Util.Crosshair,
-        HealthBar=Settings.HealthBar, Prediction=Settings.Prediction,
+        HealthBar=Settings.HealthBar, Prediction=Settings.Prediction, SilentChance=Settings.SilentChance,
         Keybinds=kb.on, FPSCap=Settings.FPSCap,
         SilentEnabled=ARS.SilentEnabled, SilentTeam=ARS.SilentTeam, SilentTarget=ARS.SilentTarget,
         SilentFOV=ARS.SilentFOV, SilentChance=ARS.SilentChance, SilentProj=ARS.SilentProj,
@@ -1434,7 +1441,7 @@ function loadConfig()
         "AimEnabled","AimMethod","AimMode","FOV","ShowFOV","Smoothing","Target","Priority",
         "AimTeamCheck","WallCheck","NoKnock","AFKProtect","MaxDistance",
         "TrigEnabled","TrigMode","TrigTarget","TrigTeamCheck","TrigNoKnock","TrigDelay",
-        "Chams","AimLock","Crosshair","HealthBar","Prediction","Keybinds","FPSCap",
+        "Chams","AimLock","Crosshair","HealthBar","Prediction","SilentChance","Keybinds","FPSCap",
         "SilentEnabled","SilentTeam","SilentTarget","SilentFOV","SilentChance","SilentProj",
         "NoSpread","NoRecoil","RapidFire","FastReload","FullAuto","HitboxExpand","HitboxSize",
         "WalkSpeed","JumpPower","InfJump","Fly","FlySpeed","Noclip","Fullbright","CamFOV","ClickTP"}) do
@@ -1607,9 +1614,13 @@ local function Unload()
     ARS.SilentEnabled=false
     ARS.HitboxExpand=false
     pcall(applyHitboxes)
-    if silentMouse.hooked and silentMouse.old then
-        pcall(hookmetamethod, game, "__index", silentMouse.old)
-        silentMouse.hooked=false
+    if silentHooks.mouseOn and silentHooks.mouseOld then
+        pcall(hookmetamethod, game, "__index", silentHooks.mouseOld)
+        silentHooks.mouseOn=false
+    end
+    if silentHooks.rayOn and silentHooks.rayOld then
+        pcall(hookmetamethod, game, "__namecall", silentHooks.rayOld)
+        silentHooks.rayOn=false
     end
     for _,c in ipairs(Conns) do pcall(function() c:Disconnect() end) end
     for p,_ in pairs(ESPData) do clearESP(p) end
@@ -1866,63 +1877,76 @@ local function setTrigState(s, nowC)
         pcall(function() trigMsgLbl.Text = "status: " .. s end)
     end
 end
-local function doTrigger(cam, mousePos, mouseRaw, myHrp, nowC)
-    if not ESP_ONLY and Settings.TrigEnabled and not Unloaded and myHrp then
-        local holdOK=true
-        if Settings.TrigMode=="Hold Key" then holdOK=isAimHeld() end
-        if holdOK then
-            local valid=false
-            local ray=cam:ViewportPointToRay(mousePos.X, mousePos.Y)
-            if ray then
-                rayParams.FilterDescendantsInstances={LocalPlayer.Character, cam}
-                local res=Workspace:Raycast(ray.Origin, ray.Direction*1000, rayParams)
-                if res and res.Instance then
-                    local hitModel=res.Instance:FindFirstAncestorOfClass("Model")
-                    local tp=hitModel and Players:GetPlayerFromCharacter(hitModel) or nil
-                    if tp and tp~=LocalPlayer then
-                        local ch=tp.Character
-                        local hum=ch and ch:FindFirstChildOfClass("Humanoid")
-                        if ch and hum and hum.Health>0 then
-                            valid=true
-                            if valid and Settings.TrigTeamCheck and tp.Team and LocalPlayer.Team and tp.Team==LocalPlayer.Team then valid=false end
-                            if valid and Settings.TrigNoKnock and isDownCached(ch, hum) then valid=false end
-                            if valid and Settings.TrigTarget=="Head" and res.Instance.Name~="Head" then valid=false end
-                            if valid and Settings.TrigTarget=="HRP" and res.Instance.Name~="HumanoidRootPart" then valid=false end
-                            if valid then
-                                local hp=ch:FindFirstChild("HumanoidRootPart")
-                                if hp then
-                                    local dx=myHrp.Position.X-hp.Position.X
-                                    local dy=myHrp.Position.Y-hp.Position.Y
-                                    local dz=myHrp.Position.Z-hp.Position.Z
-                                    if dx*dx+dy*dy+dz*dz > Settings.MaxDistance*Settings.MaxDistance then valid=false end
-                                end
-                            end
+local function doTrigger(cam, myHrp, nowC)
+    -- REMAKE: PlayerMouse + ScreenPointToRay is the classic correct pair
+    -- (viewport-relative, no inset math). Own validation, typing guard.
+    if ESP_ONLY or not Settings.TrigEnabled or Unloaded or not myHrp then
+        trigAcquireT = 0
+        setTrigState("off", nowC)
+        return
+    end
+    local typing = false
+    pcall(function() typing = UserInputService:GetFocusedTextBox() ~= nil end)
+    if typing then
+        trigAcquireT = 0
+        setTrigState("paused (typing)", nowC)
+        return
+    end
+    if Settings.TrigMode=="Hold Key" and not isAimHeld() then
+        trigAcquireT = 0
+        setTrigState("hold key...", nowC)
+        return
+    end
+    local mouse = nil
+    pcall(function() mouse = LocalPlayer:GetMouse() end)
+    local valid = false
+    if mouse and cam then
+        local ray = nil
+        pcall(function() ray = cam:ScreenPointToRay(mouse.X, mouse.Y) end)
+        if ray then
+            rayParams.FilterDescendantsInstances = {LocalPlayer.Character, cam}
+            local res = nil
+            pcall(function() res = Workspace:Raycast(ray.Origin, ray.Direction*1000, rayParams) end)
+            if res and res.Instance then
+                local hitModel = res.Instance:FindFirstAncestorOfClass("Model")
+                local tp = hitModel and Players:GetPlayerFromCharacter(hitModel) or nil
+                if tp and tp~=LocalPlayer then
+                    local ch = tp.Character
+                    local hum = ch and ch:FindFirstChildOfClass("Humanoid")
+                    if ch and hum and hum.Health>0 then
+                        valid = true
+                        if valid and Settings.TrigTeamCheck and tp.Team and LocalPlayer.Team and tp.Team==LocalPlayer.Team then valid = false end
+                        if valid and Settings.TrigNoKnock and isDownCached(ch, hum) then valid = false end
+                        if valid and Settings.TrigTarget=="Head" and res.Instance.Name~="Head" then valid = false end
+                        if valid and Settings.TrigTarget=="HRP" and res.Instance.Name~="HumanoidRootPart" then valid = false end
+                        if valid then
+                            local hp = ch:FindFirstChild("HumanoidRootPart")
+                            if hp and (myHrp.Position-hp.Position).Magnitude > Settings.MaxDistance then valid = false end
                         end
                     end
                 end
             end
-            if valid then
-                if trigAcquireT==0 then trigAcquireT=nowC setTrigState("locked", nowC) end
-                if nowC-trigAcquireT >= Settings.TrigDelay/1000 then
-                    trigAcquireT=nowC
-                    local how=fireClick(mouseRaw.X, mouseRaw.Y)
-                    if how then setTrigState("firing ("..how..")", nowC)
-                    else
-                        setTrigState("NO CLICK API", nowC)
-                        if not trigWarned then trigWarned=true warn("[NOVA] triggerbot: no click method (mouse1click/VIM/tool)") end
-                    end
-                end
+        end
+    end
+    if valid then
+        if trigAcquireT==0 then trigAcquireT=nowC setTrigState("locked", nowC) end
+        if nowC-trigAcquireT >= Settings.TrigDelay/1000 then
+            trigAcquireT=nowC
+            local mx, my = 0, 0
+            pcall(function()
+                local m2 = UserInputService:GetMouseLocation()
+                mx, my = m2.X, m2.Y
+            end)
+            local how=fireClick(mx, my)
+            if how then setTrigState("firing ("..how..")", nowC)
             else
-                trigAcquireT=0
-                setTrigState("scanning", nowC)
+                setTrigState("NO CLICK API", nowC)
+                if not trigWarned then trigWarned=true warn("[NOVA] triggerbot: no click method (mouse1click/VIM/tool)") end
             end
-        else
-            trigAcquireT=0
-            setTrigState("hold key...", nowC)
         end
     else
         trigAcquireT=0
-        setTrigState("off", nowC)
+        setTrigState("scanning", nowC)
     end
 end
 
@@ -1935,79 +1959,144 @@ for _,p in ipairs(Players:GetPlayers()) do
         end))
     end
 end
--- SILENT AIM via Mouse.Hit/Target hook (used by AimMethod "Silent", any game whose
--- tools read mouse.Hit; gated on AimEnabled, restored on Unload)
-local silentMouse = {hooked=false, old=nil}
-function silentMouse.install(on)
-    if on and not silentMouse.hooked then
-        if typeof(hookmetamethod)~="function" or typeof(checkcaller)~="function" then
-            notify("Aim", "silent needs hookmetamethod")
-            return
-        end
-        local ok=pcall(function()
-            local nc=(typeof(newcclosure)=="function" and newcclosure) or function(f) return f end
-            local function pickPart()
-                local cam=Workspace.CurrentCamera
-                if not cam then return nil end
-                local m=UserInputService:GetMouseLocation()
-                local asz=overlayGui.AbsoluteSize
-                local vpsz=cam.ViewportSize
-                local mousePos=Vector2.new(m.X-(asz.X-vpsz.X), m.Y-(asz.Y-vpsz.Y))
-                local best,bestD=nil,Settings.FOV
-                for _,p in ipairs(cachedPlayers) do
-                    if p~=LocalPlayer then
-                        local ch=p.Character
-                        local hum=ch and ch:FindFirstChildOfClass("Humanoid")
-                        if ch and hum and hum.Health>0 then
-                            local okT=true
-                            if Settings.AimTeamCheck and p.Team and LocalPlayer.Team and p.Team==LocalPlayer.Team then okT=false end
-                            if okT and Settings.NoKnock and isDownCached(ch, hum) then okT=false end
-                            if okT then
-                                local t=Settings.Target
-                                local p1=(t=="HRP") and ch:FindFirstChild("HumanoidRootPart") or ch:FindFirstChild("Head")
-                                local p2=(t=="Closest") and ch:FindFirstChild("HumanoidRootPart") or nil
-                                local cand={p1,p2}
-                                for _,part in ipairs(cand) do
-                                    if part then
-                                        local sp,ok=cam:WorldToViewportPoint(part.Position)
-                                        if ok then
-                                            local dx=sp.X-mousePos.X local dy=sp.Y-mousePos.Y
-                                            local d=math.sqrt(dx*dx+dy*dy)
-                                            if d<=bestD and (not Settings.WallCheck or isVisible(cam,ch,part.Position)) then
-                                                best,bestD=part,d
-                                            end
+-- SILENT AIM (remake): FOV target picker shared by two delivery backends.
+-- Backend 1 (mouse): hooks Mouse.Hit/Target for games whose tools read them.
+-- Backend 2 (rays): redirects workspace:Raycast shots fired from the camera
+-- toward the crosshair (most modern camera-ray guns). Both gated on
+-- AimEnabled + AimMethod=="Silent", both restored on Unload.
+local silentHooks = {mouseOld=nil, mouseOn=false, rayOld=nil, rayOn=false}
+function silentHooks.install(on)
+    if not on then return end
+    if typeof(hookmetamethod)~="function" or typeof(checkcaller)~="function" then
+        notify("Aim", "silent needs hookmetamethod")
+        return
+    end
+    local nc=(typeof(newcclosure)=="function" and newcclosure) or function(f) return f end
+    local function pickPart()
+        local cam=Workspace.CurrentCamera
+        if not cam then return nil end
+        local m=UserInputService:GetMouseLocation()
+        local asz=overlayGui.AbsoluteSize
+        local vpsz=cam.ViewportSize
+        local mousePos=Vector2.new(m.X-(asz.X-vpsz.X), m.Y-(asz.Y-vpsz.Y))
+        local best,bestD=nil,Settings.FOV
+        local myHrp=LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local maxD2=Settings.MaxDistance*Settings.MaxDistance
+        for _,p in ipairs(cachedPlayers) do
+            if p~=LocalPlayer then
+                local ch=p.Character
+                local hum=ch and ch:FindFirstChildOfClass("Humanoid")
+                if ch and hum and hum.Health>0 then
+                    local okT=true
+                    if Settings.AimTeamCheck and p.Team and LocalPlayer.Team and p.Team==LocalPlayer.Team then okT=false end
+                    if okT and Settings.NoKnock and isDownCached(ch, hum) then okT=false end
+                    if okT then
+                        local t=Settings.Target
+                        local p1=(t=="HRP") and ch:FindFirstChild("HumanoidRootPart") or ch:FindFirstChild("Head")
+                        local p2=(t=="Closest") and ch:FindFirstChild("HumanoidRootPart") or nil
+                        local cand={p1,p2}
+                        for _,part in ipairs(cand) do
+                            if part then
+                                local sp,ok=cam:WorldToViewportPoint(part.Position)
+                                if ok then
+                                    local dx=sp.X-mousePos.X local dy=sp.Y-mousePos.Y
+                                    local d=math.sqrt(dx*dx+dy*dy)
+                                    if d<=bestD and (not Settings.WallCheck or isVisible(cam,ch,part.Position)) then
+                                        local inRange=true
+                                        if myHrp then
+                                            local dd=myHrp.Position-part.Position
+                                            if dd.X*dd.X+dd.Y*dd.Y+dd.Z*dd.Z > maxD2 then inRange=false end
                                         end
+                                        if inRange then best,bestD=part,d end
                                     end
                                 end
                             end
                         end
                     end
                 end
-                return best
             end
-            silentMouse.old=hookmetamethod(game, "__index", nc(function(self, k)
+        end
+        return best
+    end
+    local function rollChance()
+        return math.random(100) <= (tonumber(Settings.SilentChance) or 100)
+    end
+    local function gated()
+        return gateOpen() and not Unloaded and not runStale()
+            and not ESP_ONLY and Settings.AimEnabled and Settings.AimMethod=="Silent"
+    end
+    if not silentHooks.mouseOn then
+        local ok=pcall(function()
+            silentHooks.mouseOld=hookmetamethod(game, "__index", nc(function(self, k)
                 if k=="Hit" or k=="Target" then
                     local okc=false
                     pcall(function() okc=not checkcaller() end)
                     if okc and typeof(self)=="Instance" then
                         local okI=false
                         pcall(function() okI=self:IsA("Mouse") end)
-                        if okI and gateOpen() and not Unloaded and not runStale()
-                            and Settings.AimEnabled and Settings.AimMethod=="Silent" then
+                        if okI and gated() then
                             local part=nil
                             pcall(function() part=pickPart() end)
-                            if part then
+                            if part and rollChance() then
                                 if k=="Target" then return part end
                                 return part.CFrame
                             end
                         end
                     end
                 end
-                return silentMouse.old(self, k)
+                return silentHooks.mouseOld(self, k)
             end))
-            silentMouse.hooked=true
+            silentHooks.mouseOn=true
         end)
-        if ok and silentMouse.hooked then notify("Aim", "silent hook ready") end
+        if not ok then silentHooks.mouseOn=false end
+    end
+    if not silentHooks.rayOn then
+        local ok=pcall(function()
+            silentHooks.rayOld=hookmetamethod(game, "__namecall", nc(function(self, ...)
+                local method=nil
+                pcall(function() method=getnamecallmethod() end)
+                if method=="Raycast" then
+                    local okc=false
+                    pcall(function() okc=not checkcaller() end)
+                    if okc and gated() then
+                        local args={...}
+                        local newRes, redirected = nil, false
+                        pcall(function()
+                            local o, d = args[1], args[2]
+                            if typeof(self)=="Instance" and self==workspace
+                                and typeof(o)=="Vector3" and typeof(d)=="Vector3" then
+                                local cam=Workspace.CurrentCamera
+                                if cam and (o-cam.CFrame.Position).Magnitude < 12 then
+                                    local dl=d.Magnitude
+                                    if dl > 0.001 and cam.CFrame.LookVector:Dot(d/dl) > 0.95 then
+                                        local part=pickPart()
+                                        if part and rollChance() then
+                                            local nd=part.Position-o
+                                            if nd.Magnitude > 0.001 then
+                                                local nl=nd.Unit*dl
+                                                if args[3]==nil then
+                                                    newRes=silentHooks.rayOld(self, o, nl)
+                                                else
+                                                    newRes=silentHooks.rayOld(self, o, nl, args[3])
+                                                end
+                                                redirected=true
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end)
+                        if redirected then return newRes end
+                    end
+                end
+                return silentHooks.rayOld(self, ...)
+            end))
+            silentHooks.rayOn=true
+        end)
+        if not ok then silentHooks.rayOn=false end
+    end
+    if silentHooks.mouseOn or silentHooks.rayOn then
+        notify("Aim", "silent ready (mouse/ray)")
     end
 end
 track(Players.PlayerAdded:Connect(function(p)
@@ -2126,7 +2215,7 @@ renderConn=track(RunService.RenderStepped:Connect(function()
         end)
     end
     if doOverlay then
-        doTrigger(cam, mousePos, mouseRaw, myHrp, nowC)
+        doTrigger(cam, myHrp, nowC)
     end
     local wantAim=false
     if not ESP_ONLY and Settings.AimEnabled and not Unloaded then

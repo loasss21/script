@@ -14,7 +14,9 @@ Roblox script: ESP / Aimbot / Misc / Utility (+ Farm-tab in South Bronx: The Tre
 
 ESP (chams, health bar) / Aimbot (sub-tabs: Aimbot + Triggerbot, target lock, prediction; methods Camera/Mouse/Silent) / Misc (server hop, keybinds window, FPS cap, copy JobId/PlaceId) / Utility (crosshair) / Arsenal-tab alleen in `arsenal.lua` (silent aim, gun mods, hitbox expander) / Farm-tab alleen in `southbronx.lua`.
 
-Triggerbot schiet via mouse1click, VirtualInputManager of Tool:Activate (fallback-keten) en toont live status in de tab. Sidebar heeft een Discord-knop (vervang `https://discord.gg/REPLACE-ME` in de `discBtn` handler door je invite-link).
+Triggerbot raycast via PlayerMouse + ScreenPointToRay (geen inset-math), met eigen validatie, typing-pauze en live status in de tab. Schiet via mouse1click, VirtualInputManager of Tool:Activate (fallback-keten). Sidebar heeft een Discord-knop (vervang `https://discord.gg/REPLACE-ME` in de `discBtn` handler door je invite-link).
+
+Aimbot-methode Silent stuurt schoten stil bij via Mouse.Hit-hook en/of Raycast-redirect (beide met hit chance, team/wall-checks); Arsenal heeft daarnaast remote-patching met redirect-teller in de statusregel.
 
 ## Usage (executor)
 
