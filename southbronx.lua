@@ -51,8 +51,8 @@ local Settings = {
     Target = "Head", Priority = "Closest", AimLock = false, Prediction = 0,
     AimTeamCheck = true, WallCheck = true, NoKnock = true,
     TrigEnabled = false, TrigMode = "Always", TrigTarget = "Any",
-    TrigTeamCheck = true, TrigNoKnock = true, TrigDelay = 120, TrigIndicator = true,
-    MaxDistance = 1000, AFKProtect = true,
+    TrigTeamCheck = true, TrigNoKnock = true, TrigDelay = 120,
+    MaxDistance = 1000, AFKProtect = true, FPSCap = 60,
     PanicKey = {Type="Key", Key=Enum.KeyCode.Delete, Name="Delete"},
     MenuKey = {Type="Key", Key=Enum.KeyCode.RightShift, Name="RightShift"},
 }
@@ -122,6 +122,7 @@ local aimingOn = false
 local trigAcquireT = 0
 local lockedPlayer = nil
 local trigMsgLbl = nil
+local kb = {win=nil, lines={}, on=true}
 local fpsAcc, fpsShown, fpsClock = 0, 60, os.clock()
 local openDropClose = nil
 -- runtime caches: avoid per-frame GetPlayers() alloc + per-label Backpack scans
@@ -214,11 +215,7 @@ local fovCircle = Instance.new("Frame")
 fovCircle.AnchorPoint=Vector2.new(0.5,0.5) fovCircle.BackgroundTransparency=1 fovCircle.Visible=false fovCircle.Active=false fovCircle.Parent=fovGui
 local fC = Instance.new("UICorner") fC.CornerRadius=UDim.new(1,0) fC.Parent=fovCircle
 local fS = Instance.new("UIStroke") fS.Thickness=1.5 fS.Color=Color3.new(1,1,1) fS.Transparency=0.15 fS.Parent=fovCircle
-local trigDot = Instance.new("Frame")
-trigDot.AnchorPoint=Vector2.new(0.5,0.5) trigDot.Size=UDim2.new(0,8,0,8)
-trigDot.BackgroundColor3=Color3.fromRGB(80,255,120) trigDot.BorderSizePixel=0
-trigDot.Visible=false trigDot.Active=false trigDot.Parent=fovGui
-do local tdC=Instance.new("UICorner") tdC.CornerRadius=UDim.new(1,0) tdC.Parent=trigDot end
+-- (trigger indicator removed; status label in Trigger tab shows state instead)
 local cross = {}
 do
     local h = Instance.new("Frame")
@@ -332,8 +329,10 @@ if KeySystemEnabled and not keyPassed then
     end)
 end
 
+local loading, spinRot, barFill, pct
+do
 local gameNameShown = GAME_VERSION
-local loading = Instance.new("Frame")
+loading = Instance.new("Frame")
 loading.AnchorPoint=Vector2.new(0.5,0.5) loading.Position=UDim2.new(0.5,0,0.5,0)
 loading.Size=UDim2.new(0,300,0,210) loading.BackgroundColor3=THEME.BG
 loading.BorderSizePixel=0 loading.Active=true loading.Draggable=true
@@ -352,7 +351,7 @@ spinBG.AnchorPoint=Vector2.new(0.5,0) spinBG.Position=UDim2.new(0.5,0,0,58)
 spinBG.Size=UDim2.new(0,44,0,44) spinBG.BackgroundTransparency=1 spinBG.Active=false spinBG.Parent=loading
 local sC=Instance.new("UICorner") sC.CornerRadius=UDim.new(1,0) sC.Parent=spinBG
 local sS=Instance.new("UIStroke") sS.Thickness=2 sS.Color=Color3.fromRGB(70,70,90) sS.Parent=spinBG
-local spinRot=Instance.new("Frame")
+spinRot=Instance.new("Frame")
 spinRot.AnchorPoint=Vector2.new(0.5,0) spinRot.Position=UDim2.new(0.5,0,0,58)
 spinRot.Size=UDim2.new(0,44,0,44) spinRot.BackgroundTransparency=1 spinRot.Active=false spinRot.Parent=loading
 local dot=Instance.new("Frame")
@@ -363,10 +362,10 @@ local barBG=Instance.new("Frame")
 barBG.Size=UDim2.new(1,-24,0,14) barBG.Position=UDim2.new(0,12,0,118)
 barBG.BackgroundColor3=THEME.Item barBG.BorderSizePixel=0 barBG.Active=false barBG.Parent=loading
 local bbgc=Instance.new("UICorner") bbgc.CornerRadius=UDim.new(0,7) bbgc.Parent=barBG
-local barFill=Instance.new("Frame")
+barFill=Instance.new("Frame")
 barFill.Size=UDim2.new(0,0,1,0) barFill.BackgroundColor3=THEME.Accent barFill.BorderSizePixel=0 barFill.Active=false barFill.Parent=barBG
 local bfc=Instance.new("UICorner") bfc.CornerRadius=UDim.new(0,7) bfc.Parent=barFill
-local pct=Instance.new("TextLabel")
+pct=Instance.new("TextLabel")
 pct.Size=UDim2.new(1,0,0,20) pct.Position=UDim2.new(0,0,0,138)
 pct.BackgroundTransparency=1 pct.Text="0%" pct.Font=Enum.Font.GothamBold
 pct.TextSize=12 pct.TextColor3=Color3.new(1,1,1) pct.Parent=loading
@@ -383,6 +382,7 @@ task.spawn(function()
         pcall(function() loadGame.Text = "Joining: " .. GAME_VERSION .. " (place " .. tostring(detectedPlace) .. ")" end)
     end
 end)
+end
 
 -- SIDEBAR MENU 620x440
 local main=Instance.new("Frame")
@@ -437,7 +437,7 @@ do
 end
 
 local nav=Instance.new("Frame")
-nav.Size=UDim2.new(1,-14,1,-86-72) nav.Position=UDim2.new(0,7,0,92)
+nav.Size=UDim2.new(1,-14,1,-86-106) nav.Position=UDim2.new(0,7,0,92)
 nav.BackgroundTransparency=1 nav.Parent=side
 local navList=Instance.new("UIListLayout")
 navList.Padding=UDim.new(0,8) navList.SortOrder=Enum.SortOrder.LayoutOrder navList.Parent=nav
@@ -453,16 +453,33 @@ end
 local navESP=mkNavBtn("ESP",1) local navAim=mkNavBtn("Aimbot",2) local navMisc=mkNavBtn("Misc",3) local navFarm=mkNavBtn("Farm",4) local navUtil=mkNavBtn("Utility",5)
 
 local foot=Instance.new("Frame")
-foot.Size=UDim2.new(1,-14,0,60) foot.Position=UDim2.new(0,7,1,-66)
+foot.Size=UDim2.new(1,-14,0,94) foot.Position=UDim2.new(0,7,1,-100)
 foot.BackgroundTransparency=1 foot.Parent=side
+local discBtn=Instance.new("TextButton")
+discBtn.Size=UDim2.new(1,0,0,28) discBtn.Position=UDim2.new(0,0,0,0)
+discBtn.Text="DISCORD" discBtn.Font=Enum.Font.GothamBold discBtn.TextSize=13
+discBtn.BackgroundColor3=Color3.fromRGB(88,101,242) discBtn.TextColor3=Color3.new(1,1,1)
+discBtn.AutoButtonColor=false discBtn.Active=true discBtn.Parent=foot
+local dc=Instance.new("UICorner") dc.CornerRadius=UDim.new(0,10) dc.Parent=discBtn
+discBtn.MouseButton1Click:Connect(function()
+    local copied=false
+    pcall(function()
+        if typeof(setclipboard)=="function" then
+            setclipboard("https://discord.gg/REPLACE-ME")
+            copied=true
+        end
+    end)
+    if copied then notify("Discord", "invite copied!")
+    else notify("Discord", "https://discord.gg/REPLACE-ME") end
+end)
 local unloadBtn=Instance.new("TextButton")
-unloadBtn.Size=UDim2.new(1,0,0,30) unloadBtn.Text="UNLOAD"
+unloadBtn.Size=UDim2.new(1,0,0,30) unloadBtn.Position=UDim2.new(0,0,0,32) unloadBtn.Text="UNLOAD"
 unloadBtn.Font=Enum.Font.GothamBold unloadBtn.TextSize=14
 unloadBtn.BackgroundColor3=Color3.fromRGB(170,40,40) unloadBtn.TextColor3=Color3.new(1,1,1)
 unloadBtn.AutoButtonColor=false unloadBtn.Active=true unloadBtn.Parent=foot
 local uc=Instance.new("UICorner") uc.CornerRadius=UDim.new(0,10) uc.Parent=unloadBtn
 local hintLbl=Instance.new("TextLabel")
-hintLbl.Size=UDim2.new(1,0,0,24) hintLbl.Position=UDim2.new(0,0,0,34)
+hintLbl.Size=UDim2.new(1,0,0,24) hintLbl.Position=UDim2.new(0,0,0,66)
 hintLbl.BackgroundTransparency=1 hintLbl.Text="RSHIFT: menu"
 hintLbl.Font=Enum.Font.Gotham hintLbl.TextSize=12 hintLbl.TextColor3=THEME.TextDim hintLbl.Parent=foot
 
@@ -891,9 +908,9 @@ do local r=newRow(aimBotBox,ab); ab=ab+1
     createToggle(r,1,"AimEnabled","Aimbot",false,function(v) Settings.AimEnabled=v aimingOn=false end,0.5,-3)
     createToggle(r,2,"ShowFOV","Show FOV",true,function(v) Settings.ShowFOV=v end,0.5,-3)
 end
-createDropdown(aimBotBox,ab,"AimMethod","Method",{"Camera","Mouse","Snap"},Settings.AimMethod,function(v) Settings.AimMethod=v end) ab=ab+1
+createDropdown(aimBotBox,ab,"AimMethod","Method",{"Camera","Mouse","Silent"},Settings.AimMethod,function(v) Settings.AimMethod=v if v=="Silent" then silentMouse.install(true) end end) ab=ab+1
 createDropdown(aimBotBox,ab,"AimMode","Mode",{"Hold","Toggle"},Settings.AimMode,function(v) Settings.AimMode=v aimingOn=false end) ab=ab+1
-createKeyPicker(aimBotBox,ab,"AimKey","Hold Key","RMB",function(d) Settings.AimKey=d aimingOn=false end) ab=ab+1
+createKeyPicker(aimBotBox,ab,"AimKey","Hold Key","RMB",function(d) Settings.AimKey=d aimingOn=false kb.refresh() end) ab=ab+1
 createSlider(aimBotBox,ab,"FOV","FOV",20,500,Settings.FOV,function(v) Settings.FOV=v end) ab=ab+1
 createSlider(aimBotBox,ab,"Smoothing","Smoothing",1,20,Settings.Smoothing,function(v) Settings.Smoothing=v end) ab=ab+1
 createSlider(aimBotBox,ab,"Prediction","Prediction",0,20,Settings.Prediction,function(v) Settings.Prediction=v end) ab=ab+1
@@ -908,10 +925,7 @@ createToggle(aimBotBox,ab,"NoKnock","No Knocked",true,function(v) Settings.NoKno
 createSlider(aimBotBox,ab,"MaxDistance","Max Distance",100,5000,Settings.MaxDistance,function(v) Settings.MaxDistance=v end) ab=ab+1
 local tc=1
 pageHeader(trigBox,tc,"Triggerbot") tc=tc+1
-do local r=newRow(trigBox,tc); tc=tc+1
-    createToggle(r,1,"TrigEnabled","Triggerbot",false,function(v) Settings.TrigEnabled=v trigAcquireT=0 end,0.5,-3)
-    createToggle(r,2,"TrigIndicator","Indicator",true,function(v) Settings.TrigIndicator=v end,0.5,-3)
-end
+createToggle(trigBox,tc,"TrigEnabled","Triggerbot",false,function(v) Settings.TrigEnabled=v trigAcquireT=0 kb.refresh() end) tc=tc+1
 createDropdown(trigBox,tc,"TrigMode","Mode",{"Always","Hold Key"},Settings.TrigMode,function(v) Settings.TrigMode=v trigAcquireT=0 end) tc=tc+1
 createDropdown(trigBox,tc,"TrigTarget","Hit Part",{"Any","Head","HRP"},Settings.TrigTarget,function(v) Settings.TrigTarget=v trigAcquireT=0 end) tc=tc+1
 do local r=newRow(trigBox,tc); tc=tc+1
@@ -1330,6 +1344,38 @@ farmUI.tpMsgLbl.LayoutOrder=fzb fzb=fzb+1 farmUI.tpMsgLbl.Size=UDim2.new(1,-4,0,
 farmUI.tpMsgLbl.Text="" farmUI.tpMsgLbl.Font=Enum.Font.Gotham
 farmUI.tpMsgLbl.TextSize=11 farmUI.tpMsgLbl.TextColor3=THEME.TextDim farmUI.tpMsgLbl.TextXAlignment=Enum.TextXAlignment.Left farmUI.tpMsgLbl.Parent=farmPage
 
+-- KEYBINDS WINDOW (Misc toggle; live names via kb.refresh)
+do
+    local w=Instance.new("Frame")
+    w.Name="NovaKeys" w.Position=UDim2.new(0,16,0,120)
+    w.Size=UDim2.new(0,190,0,122) w.BackgroundColor3=THEME.BG w.BorderSizePixel=0
+    w.Active=true w.Draggable=true w.Visible=kb.on w.Parent=gui
+    pcall(function() w:SetAttribute("nx",1) end)
+    local wc=Instance.new("UICorner") wc.CornerRadius=UDim.new(0,10) wc.Parent=w
+    local ws=Instance.new("UIStroke") ws.Color=THEME.Stroke ws.Thickness=1 ws.Parent=w
+    local t=Instance.new("TextLabel")
+    t.Size=UDim2.new(1,0,0,24) t.BackgroundTransparency=1 t.Text="KEYBINDS"
+    t.Font=Enum.Font.GothamBold t.TextSize=13 t.TextColor3=Color3.new(1,1,1) t.Parent=w
+    local function kbRow(y)
+        local l=Instance.new("TextLabel")
+        l.Size=UDim2.new(1,-16,0,18) l.Position=UDim2.new(0,8,0,y)
+        l.BackgroundTransparency=1 l.Text="" l.Font=Enum.Font.Gotham l.TextSize=12
+        l.TextColor3=THEME.TextDim l.TextXAlignment=Enum.TextXAlignment.Left l.Parent=w
+        return l
+    end
+    kb.win=w
+    kb.lines.aim=kbRow(28) kb.lines.menu=kbRow(48) kb.lines.panic=kbRow(68) kb.lines.trig=kbRow(88)
+end
+function kb.refresh()
+    pcall(function()
+        if kb.lines.aim then kb.lines.aim.Text="Aim: "..keyDataToName(Settings.AimKey) end
+        if kb.lines.menu then kb.lines.menu.Text="Menu: "..keyDataToName(Settings.MenuKey) end
+        if kb.lines.panic then kb.lines.panic.Text="Panic: "..keyDataToName(Settings.PanicKey) end
+        if kb.lines.trig then kb.lines.trig.Text="Trigger: "..(Settings.TrigEnabled and "ON" or "OFF") end
+    end)
+end
+kb.refresh()
+
 -- MISC TAB
 local mo=1
 pageHeader(miscPage,mo,"Misc") mo=mo+1
@@ -1341,9 +1387,11 @@ local perfLbl=Instance.new("TextLabel")
 perfLbl.LayoutOrder=mo mo=mo+1 perfLbl.Size=UDim2.new(1,-4,0,18) perfLbl.BackgroundTransparency=1
 perfLbl.Text="FPS: -- • Players: --" perfLbl.Font=Enum.Font.Gotham
 perfLbl.TextSize=12 perfLbl.TextColor3=THEME.TextDim perfLbl.TextXAlignment=Enum.TextXAlignment.Left perfLbl.Parent=miscPage
-createKeyPicker(miscPage,mo,"PanicKey","Panic Key","Delete",function(d) Settings.PanicKey=d end) mo=mo+1
-createKeyPicker(miscPage,mo,"MenuKey","Menu Key","RightShift",function(d) Settings.MenuKey=d pcall(function() hintLbl.Text=(d.Name or "?")..": menu" end) end) mo=mo+1
+createKeyPicker(miscPage,mo,"PanicKey","Panic Key","Delete",function(d) Settings.PanicKey=d kb.refresh() end) mo=mo+1
+createKeyPicker(miscPage,mo,"MenuKey","Menu Key","RightShift",function(d) Settings.MenuKey=d kb.refresh() pcall(function() hintLbl.Text=(d.Name or "?")..": menu" end) end) mo=mo+1
 createToggle(miscPage,mo,"AFKProtect","Anti-AFK",true,function(v) Settings.AFKProtect=v end) mo=mo+1
+createToggle(miscPage,mo,"Keybinds","Keybinds Window",true,function(v) kb.on=v if kb.win then kb.win.Visible=v end end) mo=mo+1
+createSlider(miscPage,mo,"FPSCap","FPS Cap",30,240,Settings.FPSCap,function(v) Settings.FPSCap=v pcall(function() if typeof(setfpscap)=="function" then setfpscap(v) end end) end) mo=mo+1
 local cfgNameLbl=Instance.new("TextLabel")
 cfgNameLbl.LayoutOrder=mo mo=mo+1 cfgNameLbl.Size=UDim2.new(1,-4,0,16) cfgNameLbl.BackgroundTransparency=1
 cfgNameLbl.Text="Config name" cfgNameLbl.Font=Enum.Font.GothamBold
@@ -1422,9 +1470,10 @@ function saveConfig()
         WallCheck=Settings.WallCheck, NoKnock=Settings.NoKnock, AFKProtect=Settings.AFKProtect,
         TrigEnabled=Settings.TrigEnabled, TrigMode=Settings.TrigMode, TrigTarget=Settings.TrigTarget,
         TrigTeamCheck=Settings.TrigTeamCheck, TrigNoKnock=Settings.TrigNoKnock,
-        TrigDelay=Settings.TrigDelay, TrigIndicator=Settings.TrigIndicator,
+        TrigDelay=Settings.TrigDelay,
         Chams=Settings.Chams, AimLock=Settings.AimLock, Crosshair=Util.Crosshair,
         HealthBar=Settings.HealthBar, Prediction=Settings.Prediction,
+        Keybinds=kb.on, FPSCap=Settings.FPSCap,
         MaxDistance=Settings.MaxDistance,
         WalkSpeed=Util.WalkSpeed, JumpPower=Util.JumpPower, InfJump=Util.InfJump,
         Fly=Util.Fly, FlySpeed=Util.FlySpeed, Noclip=Util.Noclip,
@@ -1450,8 +1499,8 @@ function loadConfig()
     for _, id in ipairs({"ESPEnabled","Boxes","Names","Distance","TeamCheck","MaxESP","OverlayY","Inventory","Tracers",
         "AimEnabled","AimMethod","AimMode","FOV","ShowFOV","Smoothing","Target","Priority",
         "AimTeamCheck","WallCheck","NoKnock","AFKProtect","MaxDistance",
-        "TrigEnabled","TrigMode","TrigTarget","TrigTeamCheck","TrigNoKnock","TrigDelay","TrigIndicator",
-        "Chams","AimLock","Crosshair","HealthBar","Prediction",
+        "TrigEnabled","TrigMode","TrigTarget","TrigTeamCheck","TrigNoKnock","TrigDelay",
+        "Chams","AimLock","Crosshair","HealthBar","Prediction","Keybinds","FPSCap",
         "WalkSpeed","JumpPower","InfJump","Fly","FlySpeed","Noclip","Fullbright","CamFOV","ClickTP"}) do
         apply(id, data[id])
     end
@@ -1512,6 +1561,29 @@ do
         cfgMsg.Text="no open server found"
     end)
 end
+do local r=newRow(miscPage,mo); mo=mo+1
+    local cj=Instance.new("TextButton")
+    cj.LayoutOrder=1 cj.Size=UDim2.new(0.5,-3,0,30) cj.Text="Copy JobId"
+    cj.Font=Enum.Font.GothamBold cj.TextSize=13 cj.BackgroundColor3=THEME.Item
+    cj.TextColor3=Color3.new(1,1,1) cj.AutoButtonColor=false cj.Active=true cj.Parent=r
+    local cjc=Instance.new("UICorner") cjc.CornerRadius=UDim.new(0,8) cjc.Parent=cj
+    cj.MouseButton1Click:Connect(function()
+        local j="" pcall(function() j=game.JobId end)
+        local ok=false
+        pcall(function() if typeof(setclipboard)=="function" then setclipboard(j) ok=true end end)
+        cfgMsg.Text=ok and "jobid copied" or ("job: "..j)
+    end)
+    local cp=Instance.new("TextButton")
+    cp.LayoutOrder=2 cp.Size=UDim2.new(0.5,-3,0,30) cp.Text="Copy PlaceId"
+    cp.Font=Enum.Font.GothamBold cp.TextSize=13 cp.BackgroundColor3=THEME.Item
+    cp.TextColor3=Color3.new(1,1,1) cp.AutoButtonColor=false cp.Active=true cp.Parent=r
+    local cpc=Instance.new("UICorner") cpc.CornerRadius=UDim.new(0,8) cpc.Parent=cp
+    cp.MouseButton1Click:Connect(function()
+        local ok=false
+        pcall(function() if typeof(setclipboard)=="function" then setclipboard(tostring(game.PlaceId)) ok=true end end)
+        cfgMsg.Text=ok and "placeid copied" or ("place: "..tostring(game.PlaceId))
+    end)
+end
 
 -- UTILITY TAB (movement + world)
 local uo=1
@@ -1559,6 +1631,10 @@ local function Unload()
     activeDragFn=nil aimingOn=false openDropClose=nil
     if Util.Fly then Util.Fly=false stopFly() end
     if Util.Fullbright then Util.Fullbright=false setFullbright(false) end
+    if silentMouse.hooked and silentMouse.old then
+        pcall(hookmetamethod, game, "__index", silentMouse.old)
+        silentMouse.hooked=false
+    end
     for _,c in ipairs(Conns) do pcall(function() c:Disconnect() end) end
     for p,_ in pairs(ESPData) do clearESP(p) end
     for _,p in ipairs(cachedPlayers) do if p.Character then deepCleanCharacter(p.Character) end end
@@ -1807,16 +1883,14 @@ local function findTarget(cam,mousePos,myHrp)
     return nil
 end
 
-local trigState, lastTrigMsgW = "off", 0
+local lastTrigMsgW = 0
 local function setTrigState(s, nowC)
-    trigState = s
     if trigMsgLbl and nowC - lastTrigMsgW > 0.2 then
         lastTrigMsgW = nowC
         pcall(function() trigMsgLbl.Text = "status: " .. s end)
     end
 end
 local function doTrigger(cam, mousePos, mouseRaw, myHrp, nowC)
-    local showDot=false
     if not ESP_ONLY and Settings.TrigEnabled and not Unloaded and myHrp then
         local holdOK=true
         if Settings.TrigMode=="Hold Key" then holdOK=isAimHeld() end
@@ -1852,7 +1926,6 @@ local function doTrigger(cam, mousePos, mouseRaw, myHrp, nowC)
                 end
             end
             if valid then
-                showDot=true
                 if trigAcquireT==0 then trigAcquireT=nowC setTrigState("locked", nowC) end
                 if nowC-trigAcquireT >= Settings.TrigDelay/1000 then
                     trigAcquireT=nowC
@@ -1875,14 +1948,6 @@ local function doTrigger(cam, mousePos, mouseRaw, myHrp, nowC)
         trigAcquireT=0
         setTrigState("off", nowC)
     end
-    if trigDot then
-        if showDot and Settings.TrigIndicator then
-            trigDot.Visible=true
-            pcall(function() trigDot.Position=UDim2.new(0,mouseRaw.X,0,mouseRaw.Y) end)
-        else
-            trigDot.Visible=false
-        end
-    end
 end
 
 for _,p in ipairs(Players:GetPlayers()) do
@@ -1892,6 +1957,81 @@ for _,p in ipairs(Players:GetPlayers()) do
             if not LoadingDone or Unloaded then return end
             clearESP(p) task.wait(1) if LoadingDone and not Unloaded and not runStale() then createESP(p) end
         end))
+    end
+end
+-- SILENT AIM via Mouse.Hit/Target hook (used by AimMethod "Silent", any game whose
+-- tools read mouse.Hit; gated on AimEnabled, restored on Unload)
+local silentMouse = {hooked=false, old=nil}
+function silentMouse.install(on)
+    if on and not silentMouse.hooked then
+        if typeof(hookmetamethod)~="function" or typeof(checkcaller)~="function" then
+            notify("Aim", "silent needs hookmetamethod")
+            return
+        end
+        local ok=pcall(function()
+            local nc=(typeof(newcclosure)=="function" and newcclosure) or function(f) return f end
+            local function pickPart()
+                local cam=Workspace.CurrentCamera
+                if not cam then return nil end
+                local m=UserInputService:GetMouseLocation()
+                local asz=overlayGui.AbsoluteSize
+                local vpsz=cam.ViewportSize
+                local mousePos=Vector2.new(m.X-(asz.X-vpsz.X), m.Y-(asz.Y-vpsz.Y))
+                local best,bestD=nil,Settings.FOV
+                for _,p in ipairs(cachedPlayers) do
+                    if p~=LocalPlayer then
+                        local ch=p.Character
+                        local hum=ch and ch:FindFirstChildOfClass("Humanoid")
+                        if ch and hum and hum.Health>0 then
+                            local okT=true
+                            if Settings.AimTeamCheck and p.Team and LocalPlayer.Team and p.Team==LocalPlayer.Team then okT=false end
+                            if okT and Settings.NoKnock and isDownCached(ch, hum) then okT=false end
+                            if okT then
+                                local t=Settings.Target
+                                local p1=(t=="HRP") and ch:FindFirstChild("HumanoidRootPart") or ch:FindFirstChild("Head")
+                                local p2=(t=="Closest") and ch:FindFirstChild("HumanoidRootPart") or nil
+                                local cand={p1,p2}
+                                for _,part in ipairs(cand) do
+                                    if part then
+                                        local sp,ok=cam:WorldToViewportPoint(part.Position)
+                                        if ok then
+                                            local dx=sp.X-mousePos.X local dy=sp.Y-mousePos.Y
+                                            local d=math.sqrt(dx*dx+dy*dy)
+                                            if d<=bestD and (not Settings.WallCheck or isVisible(cam,ch,part.Position)) then
+                                                best,bestD=part,d
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+                return best
+            end
+            silentMouse.old=hookmetamethod(game, "__index", nc(function(self, k)
+                if k=="Hit" or k=="Target" then
+                    local okc=false
+                    pcall(function() okc=not checkcaller() end)
+                    if okc and typeof(self)=="Instance" then
+                        local okI=false
+                        pcall(function() okI=self:IsA("Mouse") end)
+                        if okI and gateOpen() and not Unloaded and not runStale()
+                            and Settings.AimEnabled and Settings.AimMethod=="Silent" then
+                            local part=nil
+                            pcall(function() part=pickPart() end)
+                            if part then
+                                if k=="Target" then return part end
+                                return part.CFrame
+                            end
+                        end
+                    end
+                end
+                return silentMouse.old(self, k)
+            end))
+            silentMouse.hooked=true
+        end)
+        if ok and silentMouse.hooked then notify("Aim", "silent hook ready") end
     end
 end
 track(Players.PlayerAdded:Connect(function(p)
@@ -2011,8 +2151,6 @@ renderConn=track(RunService.RenderStepped:Connect(function()
     end
     if doOverlay then
         doTrigger(cam, mousePos, mouseRaw, myHrp, nowC)
-    elseif trigDot then
-        trigDot.Visible=false
     end
     local wantAim=false
     if not ESP_ONLY and Settings.AimEnabled and not Unloaded then
@@ -2045,7 +2183,8 @@ renderConn=track(RunService.RenderStepped:Connect(function()
             bestPos=bestPos+lockVel*(Settings.Prediction*0.01)
         end
         if bestPos then
-            if Settings.AimMethod=="Snap" then cam.CFrame=CFrame.new(cam.CFrame.Position,bestPos)
+            if Settings.AimMethod=="Silent" then
+                -- mouse hook redirects shots; leave the camera alone
             elseif Settings.AimMethod=="Mouse" and hasMouseMove then
                 local sp,_=cam:WorldToViewportPoint(bestPos)
                 local s=math.max(1,Settings.Smoothing)
