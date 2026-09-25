@@ -424,7 +424,7 @@ do -- soft drop shadow + accent hairline
     sh.Size=UDim2.new(1,24,1,24) sh.Position=UDim2.new(0,-12,0,-10)
     sh.Image="rbxassetid://5554236805" sh.ImageColor3=Color3.new(0,0,0)
     sh.ImageTransparency=0.55 sh.ScaleType=Enum.ScaleType.Slice
-    sh.SliceCenter=RectOffset.new(96,96,96,96) sh.Parent=main
+    sh.Parent=main
     local top=Instance.new("Frame")
     top.Size=UDim2.new(1,-32,0,2) top.Position=UDim2.new(0,16,0,0)
     top.BackgroundColor3=THEME.Accent top.BorderSizePixel=0 top.Active=false top.ZIndex=2 top.Parent=main
