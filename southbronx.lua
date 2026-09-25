@@ -52,6 +52,8 @@ local Settings = {
     FOV = 120, ShowFOV = true, Smoothing = 6,
     Target = "Head", Priority = "Closest", AimLock = false, Prediction = 0,
     AimTeamCheck = true, WallCheck = true, NoKnock = true,
+    Ragebot = false, RageFOV = 300, RageSmooth = 2, RageReact = 120,
+    Recoil = false, RecoilX = 60, RecoilY = 90, NoSnap = true,
     MaxDistance = 1000, AFKProtect = true, FPSCap = 60, FPSOverlay = true,
     PanicKey = {Type="Key", Key=Enum.KeyCode.Delete, Name="Delete"},
     MenuKey = {Type="Key", Key=Enum.KeyCode.RightShift, Name="RightShift"},
@@ -106,6 +108,7 @@ local lastFOV = -1
 local aimingOn = false
 local lockedPlayer = nil
 local kb = {win=nil, lines={}, on=false}
+local Rage = {lastPl=nil, lastT=0}
 local fpsAcc, fpsShown, fpsClock = 0, 60, os.clock()
 local openDropClose = nil
 -- runtime caches: avoid per-frame GetPlayers() alloc + per-label Backpack scans
@@ -496,10 +499,10 @@ local nav=Instance.new("Frame")
 nav.Size=UDim2.new(1,-14,1,-86-106) nav.Position=UDim2.new(0,7,0,92)
 nav.BackgroundTransparency=1 nav.Parent=side
 local navList=Instance.new("UIListLayout")
-navList.Padding=UDim.new(0,8) navList.SortOrder=Enum.SortOrder.LayoutOrder navList.Parent=nav
+navList.Padding=UDim.new(0,6) navList.SortOrder=Enum.SortOrder.LayoutOrder navList.Parent=nav
 local function mkNavBtn(name, order)
     local b=Instance.new("TextButton")
-    b.LayoutOrder=order b.Size=UDim2.new(1,0,0,38)
+    b.LayoutOrder=order b.Size=UDim2.new(1,0,0,34)
     b.Text="  "..name b.Font=Enum.Font.GothamBold b.TextSize=14
     b.TextXAlignment=Enum.TextXAlignment.Left
     b.AutoButtonColor=false b.Active=true b.Parent=nav
@@ -522,7 +525,7 @@ local function mkNavBtn(name, order)
     end)
     return b
 end
-local navESP=mkNavBtn("ESP",1) local navAim=mkNavBtn("Aimbot",2) local navMisc=mkNavBtn("Misc",3) local navFarm=mkNavBtn("Farm",4) local navUtil=mkNavBtn("Utility",5)
+local navESP=mkNavBtn("ESP",1) local navAim=mkNavBtn("Aimbot",2) local navMisc=mkNavBtn("Misc",3) local navFarm=mkNavBtn("Farm",4) local navUtil=mkNavBtn("Utility",5) local navRage=mkNavBtn("Rage",6)
 
 local foot=Instance.new("Frame")
 foot.Size=UDim2.new(1,-14,0,94) foot.Position=UDim2.new(0,7,1,-100)
@@ -576,8 +579,8 @@ local function mkPage()
     pad.PaddingTop=UDim.new(0,2) pad.PaddingLeft=UDim.new(0,2) pad.PaddingRight=UDim.new(0,6) pad.PaddingBottom=UDim.new(0,12) pad.Parent=p
     return p
 end
-local espPage=mkPage() local aimPage=mkPage() local miscPage=mkPage() local farmPage=mkPage() local utilPage=mkPage()
-aimPage.Visible=false miscPage.Visible=false farmPage.Visible=false utilPage.Visible=false
+local espPage=mkPage() local aimPage=mkPage() local miscPage=mkPage() local farmPage=mkPage() local utilPage=mkPage() local ragePage=mkPage()
+aimPage.Visible=false miscPage.Visible=false farmPage.Visible=false utilPage.Visible=false ragePage.Visible=false
 
 local function paintNav(which)
     local function st(b,on)
@@ -592,11 +595,11 @@ local function paintNav(which)
             if sr then sr.Color=THEME.Stroke sr.Transparency=0.5 end
         end
     end
-    st(navESP,which=="ESP") st(navAim,which=="Aim") st(navMisc,which=="Misc") st(navFarm,which=="Farm") st(navUtil,which=="Util")
+    st(navESP,which=="ESP") st(navAim,which=="Aim") st(navMisc,which=="Misc") st(navFarm,which=="Farm") st(navUtil,which=="Util") st(navRage,which=="Rage")
 end
 local function setTab(w)
-    espPage.Visible=(w=="ESP") aimPage.Visible=(w=="Aim") miscPage.Visible=(w=="Misc") farmPage.Visible=(w=="Farm") utilPage.Visible=(w=="Util")
-    espPage.CanvasPosition=Vector2.new(0,0) aimPage.CanvasPosition=Vector2.new(0,0) miscPage.CanvasPosition=Vector2.new(0,0) farmPage.CanvasPosition=Vector2.new(0,0) utilPage.CanvasPosition=Vector2.new(0,0)
+    espPage.Visible=(w=="ESP") aimPage.Visible=(w=="Aim") miscPage.Visible=(w=="Misc") farmPage.Visible=(w=="Farm") utilPage.Visible=(w=="Util") ragePage.Visible=(w=="Rage")
+    espPage.CanvasPosition=Vector2.new(0,0) aimPage.CanvasPosition=Vector2.new(0,0) miscPage.CanvasPosition=Vector2.new(0,0) farmPage.CanvasPosition=Vector2.new(0,0) utilPage.CanvasPosition=Vector2.new(0,0) ragePage.CanvasPosition=Vector2.new(0,0)
     paintNav(w)
     pcall(function()
         local ts=game:GetService("TweenService")
@@ -609,8 +612,9 @@ navAim.MouseButton1Click:Connect(function() setTab("Aim") end)
 navMisc.MouseButton1Click:Connect(function() setTab("Misc") end)
 navFarm.MouseButton1Click:Connect(function() setTab("Farm") end)
 navUtil.MouseButton1Click:Connect(function() setTab("Util") end)
+navRage.MouseButton1Click:Connect(function() setTab("Rage") end)
 setTab("ESP")
-if ESP_ONLY then navAim.Visible=false end
+if ESP_ONLY then navAim.Visible=false navRage.Visible=false end
 
 local function regHandle(id, setFn)
     UIHandles[id]=setFn
@@ -982,6 +986,30 @@ do
 end
 
 
+
+-- RAGE TAB (standalone aggressive aim + recoil, hidden in ESP-only mode)
+if not ESP_ONLY then
+local ra=1
+pageHeader(ragePage,ra,"Rage") ra=ra+1
+do local r=newRow(ragePage,ra); ra=ra+1
+    createToggle(r,1,"Ragebot","Ragebot",false,function(v) Settings.Ragebot=v end,0.5,-3)
+    createToggle(r,2,"NoSnap","No Snap",true,function(v) Settings.NoSnap=v end,0.5,-3)
+end
+createSlider(ragePage,ra,"RageFOV","Rage FOV",40,500,Settings.RageFOV,function(v) Settings.RageFOV=v end) ra=ra+1
+createSlider(ragePage,ra,"RageSmooth","Rage Smooth",1,10,Settings.RageSmooth,function(v) Settings.RageSmooth=v end) ra=ra+1
+createSlider(ragePage,ra,"RageReact","Reaction ms",0,500,Settings.RageReact,function(v) Settings.RageReact=v end) ra=ra+1
+pageHeader(ragePage,ra,"Recoil Control") ra=ra+1
+createToggle(ragePage,ra,"Recoil","Recoil Control",false,function(v) Settings.Recoil=v end) ra=ra+1
+createSlider(ragePage,ra,"RecoilX","X Strength",0,100,Settings.RecoilX,function(v) Settings.RecoilX=v end) ra=ra+1
+createSlider(ragePage,ra,"RecoilY","Y Strength",0,100,Settings.RecoilY,function(v) Settings.RecoilY=v end) ra=ra+1
+do
+    local info=Instance.new("TextLabel")
+    info.LayoutOrder=ra ra=ra+1 info.Size=UDim2.new(1,-4,0,30)
+    info.BackgroundTransparency=1 info.Text="Ragebot forces Head + Closest. Recoil works standalone while firing (hold LMB)."
+    info.Font=Enum.Font.Gotham info.TextSize=11 info.TextColor3=THEME.TextDim
+    info.TextWrapped=true info.Parent=ragePage
+end
+end -- rage tab
 
 -- FARM TAB (southbronx file only: movement, ATM/marsh farm, teleports)
 local SB = {AutoATM=false, ATMCooldown=10, SafeTP=true, MarshFarm=false}
@@ -1505,6 +1533,9 @@ function saveConfig()
         FOV=Settings.FOV, ShowFOV=Settings.ShowFOV, Smoothing=Settings.Smoothing,
         Target=Settings.Target, Priority=Settings.Priority, AimTeamCheck=Settings.AimTeamCheck,
         WallCheck=Settings.WallCheck, NoKnock=Settings.NoKnock, AFKProtect=Settings.AFKProtect,
+        Ragebot=Settings.Ragebot, RageFOV=Settings.RageFOV, RageSmooth=Settings.RageSmooth,
+        RageReact=Settings.RageReact, Recoil=Settings.Recoil, RecoilX=Settings.RecoilX,
+        RecoilY=Settings.RecoilY, NoSnap=Settings.NoSnap,
         Chams=Settings.Chams, AimLock=Settings.AimLock, Crosshair=Util.Crosshair,
         HealthBar=Settings.HealthBar, Prediction=Settings.Prediction,
         Keybinds=kb.on, FPSCap=Settings.FPSCap, FPSOverlay=Settings.FPSOverlay,
@@ -1533,6 +1564,7 @@ function loadConfig()
     for _, id in ipairs({"ESPEnabled","Boxes","Names","Distance","TeamCheck","MaxESP","OverlayY","Inventory","Tracers",
         "AimEnabled","AimMethod","AimMode","FOV","ShowFOV","Smoothing","Target","Priority",
         "AimTeamCheck","WallCheck","NoKnock","AFKProtect","MaxDistance",
+        "Ragebot","RageFOV","RageSmooth","RageReact","Recoil","RecoilX","RecoilY","NoSnap",
         "Chams","AimLock","Crosshair","HealthBar","Prediction","Keybinds","FPSCap","FPSOverlay",
         "WalkSpeed","JumpPower","InfJump","Fly","FlySpeed","Noclip","Fullbright","CamFOV","ClickTP"}) do
         apply(id, data[id])
@@ -2104,6 +2136,37 @@ renderConn=track(RunService.RenderStepped:Connect(function()
         end
     else
         lockedPlayer=nil
+    end
+    if not ESP_ONLY and Settings.Ragebot and not Unloaded and myHrp then
+        local sF, sT, sP = Settings.FOV, Settings.Target, Settings.Priority
+        Settings.FOV, Settings.Target, Settings.Priority = Settings.RageFOV, "Head", "Closest"
+        local wp,pl = findTarget(cam,mousePos,myHrp)
+        Settings.FOV, Settings.Target, Settings.Priority = sF, sT, sP
+        local gated=false
+        if pl ~= Rage.lastPl then
+            if nowC - (Rage.lastT or 0) < Settings.RageReact/1000 then gated=true
+            else Rage.lastPl=pl Rage.lastT=nowC end
+        end
+        if wp and not gated then
+            local f=1/math.max(1,Settings.RageSmooth)
+            if Settings.NoSnap then f=math.min(f,0.4) end
+            local goal=CFrame.new(cam.CFrame.Position,wp)
+            cam.CFrame=cam.CFrame:Lerp(goal,math.clamp(f,0.05,1))
+        end
+        if pl==nil then Rage.lastPl=nil end
+    end
+    if not ESP_ONLY and Settings.Recoil and not Unloaded then
+        local firing=false
+        pcall(function() firing = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) end)
+        if firing then
+            if hasMouseMove then
+                local dx=(Settings.RecoilX or 0)/100*2
+                local dy=(Settings.RecoilY or 0)/100*3
+                if dx~=0 or dy~=0 then pcall(function() mousemoverel(dx,dy) end) end
+            elseif not mouseWarned then
+                mouseWarned=true warn("[Recoil] mousemoverel missing")
+            end
+        end
     end
 end))
 

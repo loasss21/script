@@ -52,6 +52,8 @@ local Settings = {
     FOV = 100, ShowFOV = true, Smoothing = 4,
     Target = "Head", Priority = "Closest", AimLock = false, Prediction = 0,
     AimTeamCheck = true, WallCheck = true, NoKnock = true,
+    Ragebot = false, RageFOV = 300, RageSmooth = 2, RageReact = 120,
+    Recoil = false, RecoilX = 60, RecoilY = 90, NoSnap = true,
     MaxDistance = 1000, AFKProtect = true, FPSCap = 60, FPSOverlay = true,
     PanicKey = {Type="Key", Key=Enum.KeyCode.Delete, Name="Delete"},
     MenuKey = {Type="Key", Key=Enum.KeyCode.RightShift, Name="RightShift"},
@@ -97,6 +99,7 @@ local lastFOV = -1
 local aimingOn = false
 local lockedPlayer = nil
 local kb = {win=nil, lines={}, on=false}
+local Rage = {lastPl=nil, lastT=0}
 local fpsAcc, fpsShown, fpsClock = 0, 60, os.clock()
 local openDropClose = nil
 -- runtime caches: avoid per-frame GetPlayers() alloc + per-label Backpack scans
@@ -484,10 +487,10 @@ local nav=Instance.new("Frame")
 nav.Size=UDim2.new(1,-14,1,-86-106) nav.Position=UDim2.new(0,7,0,92)
 nav.BackgroundTransparency=1 nav.Parent=side
 local navList=Instance.new("UIListLayout")
-navList.Padding=UDim.new(0,8) navList.SortOrder=Enum.SortOrder.LayoutOrder navList.Parent=nav
+navList.Padding=UDim.new(0,6) navList.SortOrder=Enum.SortOrder.LayoutOrder navList.Parent=nav
 local function mkNavBtn(name, order)
     local b=Instance.new("TextButton")
-    b.LayoutOrder=order b.Size=UDim2.new(1,0,0,38)
+    b.LayoutOrder=order b.Size=UDim2.new(1,0,0,34)
     b.Text="  "..name b.Font=Enum.Font.GothamBold b.TextSize=14
     b.TextXAlignment=Enum.TextXAlignment.Left
     b.AutoButtonColor=false b.Active=true b.Parent=nav
@@ -510,7 +513,7 @@ local function mkNavBtn(name, order)
     end)
     return b
 end
-local navESP=mkNavBtn("ESP",1) local navAim=mkNavBtn("Aimbot",2) local navMisc=mkNavBtn("Misc",3) local navUtil=mkNavBtn("Utility",4) local navArsenal=mkNavBtn("Arsenal",5)
+local navESP=mkNavBtn("ESP",1) local navAim=mkNavBtn("Aimbot",2) local navMisc=mkNavBtn("Misc",3) local navUtil=mkNavBtn("Utility",4) local navArsenal=mkNavBtn("Arsenal",5) local navRage=mkNavBtn("Rage",6)
 
 local foot=Instance.new("Frame")
 foot.Size=UDim2.new(1,-14,0,94) foot.Position=UDim2.new(0,7,1,-100)
@@ -564,8 +567,8 @@ local function mkPage()
     pad.PaddingTop=UDim.new(0,2) pad.PaddingLeft=UDim.new(0,2) pad.PaddingRight=UDim.new(0,6) pad.PaddingBottom=UDim.new(0,12) pad.Parent=p
     return p
 end
-local espPage=mkPage() local aimPage=mkPage() local miscPage=mkPage() local utilPage=mkPage() local arsPage=mkPage()
-aimPage.Visible=false miscPage.Visible=false utilPage.Visible=false arsPage.Visible=false
+local espPage=mkPage() local aimPage=mkPage() local miscPage=mkPage() local utilPage=mkPage() local arsPage=mkPage() local ragePage=mkPage()
+aimPage.Visible=false miscPage.Visible=false utilPage.Visible=false arsPage.Visible=false ragePage.Visible=false
 
 local function paintNav(which)
     local function st(b,on)
@@ -580,11 +583,11 @@ local function paintNav(which)
             if sr then sr.Color=THEME.Stroke sr.Transparency=0.5 end
         end
     end
-    st(navESP,which=="ESP") st(navAim,which=="Aim") st(navMisc,which=="Misc") st(navUtil,which=="Util") st(navArsenal,which=="Ars")
+    st(navESP,which=="ESP") st(navAim,which=="Aim") st(navMisc,which=="Misc") st(navUtil,which=="Util") st(navArsenal,which=="Ars") st(navRage,which=="Rage")
 end
 local function setTab(w)
-    espPage.Visible=(w=="ESP") aimPage.Visible=(w=="Aim") miscPage.Visible=(w=="Misc") utilPage.Visible=(w=="Util") arsPage.Visible=(w=="Ars")
-    espPage.CanvasPosition=Vector2.new(0,0) aimPage.CanvasPosition=Vector2.new(0,0) miscPage.CanvasPosition=Vector2.new(0,0) utilPage.CanvasPosition=Vector2.new(0,0) arsPage.CanvasPosition=Vector2.new(0,0)
+    espPage.Visible=(w=="ESP") aimPage.Visible=(w=="Aim") miscPage.Visible=(w=="Misc") utilPage.Visible=(w=="Util") arsPage.Visible=(w=="Ars") ragePage.Visible=(w=="Rage")
+    espPage.CanvasPosition=Vector2.new(0,0) aimPage.CanvasPosition=Vector2.new(0,0) miscPage.CanvasPosition=Vector2.new(0,0) utilPage.CanvasPosition=Vector2.new(0,0) arsPage.CanvasPosition=Vector2.new(0,0) ragePage.CanvasPosition=Vector2.new(0,0)
     paintNav(w)
     pcall(function()
         local ts=game:GetService("TweenService")
@@ -597,8 +600,9 @@ navAim.MouseButton1Click:Connect(function() setTab("Aim") end)
 navMisc.MouseButton1Click:Connect(function() setTab("Misc") end)
 navUtil.MouseButton1Click:Connect(function() setTab("Util") end)
 navArsenal.MouseButton1Click:Connect(function() setTab("Ars") end)
+navRage.MouseButton1Click:Connect(function() setTab("Rage") end)
 setTab("ESP")
-if ESP_ONLY then navAim.Visible=false end
+if ESP_ONLY then navAim.Visible=false navRage.Visible=false end
 
 local function regHandle(id, setFn)
     UIHandles[id]=setFn
@@ -1133,9 +1137,34 @@ createToggle(aimPage,ab,"NoKnock","No Knocked",true,function(v) Settings.NoKnock
 createSlider(aimPage,ab,"MaxDistance","Max Distance",100,5000,Settings.MaxDistance,function(v) Settings.MaxDistance=v end) ab=ab+1
 end -- aim tab
 
+-- RAGE TAB (standalone aggressive aim + recoil, hidden in ESP-only mode)
+if not ESP_ONLY then
+local ra=1
+pageHeader(ragePage,ra,"Rage") ra=ra+1
+do local r=newRow(ragePage,ra); ra=ra+1
+    createToggle(r,1,"Ragebot","Ragebot",false,function(v) Settings.Ragebot=v end,0.5,-3)
+    createToggle(r,2,"NoSnap","No Snap",true,function(v) Settings.NoSnap=v end,0.5,-3)
+end
+createSlider(ragePage,ra,"RageFOV","Rage FOV",40,500,Settings.RageFOV,function(v) Settings.RageFOV=v end) ra=ra+1
+createSlider(ragePage,ra,"RageSmooth","Rage Smooth",1,10,Settings.RageSmooth,function(v) Settings.RageSmooth=v end) ra=ra+1
+createSlider(ragePage,ra,"RageReact","Reaction ms",0,500,Settings.RageReact,function(v) Settings.RageReact=v end) ra=ra+1
+pageHeader(ragePage,ra,"Recoil Control") ra=ra+1
+createToggle(ragePage,ra,"Recoil","Recoil Control",false,function(v) Settings.Recoil=v end) ra=ra+1
+createSlider(ragePage,ra,"RecoilX","X Strength",0,100,Settings.RecoilX,function(v) Settings.RecoilX=v end) ra=ra+1
+createSlider(ragePage,ra,"RecoilY","Y Strength",0,100,Settings.RecoilY,function(v) Settings.RecoilY=v end) ra=ra+1
+do
+    local info=Instance.new("TextLabel")
+    info.LayoutOrder=ra ra=ra+1 info.Size=UDim2.new(1,-4,0,30)
+    info.BackgroundTransparency=1 info.Text="Ragebot forces Head + Closest. Recoil works standalone while firing (hold LMB)."
+    info.Font=Enum.Font.Gotham info.TextSize=11 info.TextColor3=THEME.TextDim
+    info.TextWrapped=true info.Parent=ragePage
+end
+end -- rage tab
+
 -- ARSENAL-ONLY (gun mods, hitbox expander)
 local ARS = {NoSpread=false, NoRecoil=false, RapidFire=false, FastReload=false, FullAuto=false,
-    HitboxExpand=false, HitboxSize=3}
+    HitboxExpand=false, HitboxSize=3,
+    SilentEnabled=false, SilentTeam=true, SilentPart="Hitbox", SilentFOV=120, SilentChance=100, SilentWall=true}
 
 local function applyGunMods()
     local weapons=nil
@@ -1203,6 +1232,114 @@ track(RunService.Heartbeat:Connect(function()
     if ARS.HitboxExpand or next(origSizes)~=nil then applyHitboxes() end
 end))
 
+-- ARSENAL SILENT AIM (researched method: HitPart/Trail/CreateProjectile
+-- FireServer hook -> closest enemy Hitbox; mouse.Hit fallback below).
+-- Needs hookmetamethod/getnamecallmethod/checkcaller; restored on Unload.
+local function getSilentTarget()
+    local cam=Workspace.CurrentCamera
+    if not cam then return nil end
+    local m=nil
+    pcall(function() m=UserInputService:GetMouseLocation() end)
+    if not m then return nil end
+    local asz=overlayGui.AbsoluteSize
+    local vpsz=cam.ViewportSize
+    local mx,my=m.X-(asz.X-vpsz.X),m.Y-(asz.Y-vpsz.Y)
+    local best,bestD=nil,ARS.SilentFOV
+    local myHrp=LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local maxD2=Settings.MaxDistance*Settings.MaxDistance
+    for _,p in ipairs(cachedPlayers) do
+        if p~=LocalPlayer then
+            local ch=p.Character
+            local hum=ch and ch:FindFirstChildOfClass("Humanoid")
+            if ch and hum and hum.Health>0 then
+                local enemy=true
+                if ARS.SilentTeam and p.Team and LocalPlayer.Team and p.Team==LocalPlayer.Team then enemy=false end
+                if enemy then
+                    local part=ch:FindFirstChild(ARS.SilentPart) or ch:FindFirstChild("Head") or ch:FindFirstChild("HumanoidRootPart")
+                    if part then
+                        local sp,ok=cam:WorldToViewportPoint(part.Position)
+                        if ok then
+                            local dx,dy=sp.X-mx,sp.Y-my
+                            local d=math.sqrt(dx*dx+dy*dy)
+                            if d<=bestD then
+                                local inRange=true
+                                if myHrp then
+                                    local dd=myHrp.Position-part.Position
+                                    if dd.X*dd.X+dd.Y*dd.Y+dd.Z*dd.Z > maxD2 then inRange=false end
+                                end
+                                local vis=true
+                                if inRange and ARS.SilentWall then
+                                    if LocalPlayer.Character then rayParams.FilterDescendantsInstances={LocalPlayer.Character}
+                                    else rayParams.FilterDescendantsInstances={} end
+                                    local res=Workspace:Raycast(cam.CFrame.Position,part.Position-cam.CFrame.Position,rayParams)
+                                    if res and not res.Instance:IsDescendantOf(ch) then vis=false end
+                                end
+                                if inRange and vis then best,bestD=part,d end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+local function installSilent(on)
+    if not on then return end
+    if ARS.silentOld ~= nil then return end
+    if typeof(hookmetamethod)~="function" or typeof(getnamecallmethod)~="function" or typeof(checkcaller)~="function" then
+        notify("Arsenal", "silent needs hook API")
+        return
+    end
+    local ok=pcall(function()
+        local nc=(typeof(newcclosure)=="function" and newcclosure) or function(f) return f end
+        ARS.silentOld=hookmetamethod(game, "__namecall", nc(function(self, ...)
+            local method=nil
+            pcall(function() method=getnamecallmethod() end)
+            if method=="FireServer" then
+                local okc=false
+                pcall(function() okc=not checkcaller() end)
+                if okc and ARS.SilentEnabled and not Unloaded and not runStale() then
+                    local rname=nil
+                    pcall(function() rname=tostring(self) end)
+                    if rname=="HitPart" or rname=="Trail" or rname=="CreateProjectile" then
+                        local part=nil
+                        pcall(function() part=getSilentTarget() end)
+                        if part and math.random(100)<=(tonumber(ARS.SilentChance) or 100) then
+                            local args={...}
+                            local argc=select("#",...)
+                            local patched=false
+                            pcall(function()
+                                if rname=="HitPart" then
+                                    args[1]=part patched=true
+                                elseif rname=="Trail" then
+                                    if type(args[1])=="table" and type(args[1][5])=="string" then
+                                        args[1][6]=part args[1][2]=part.Position patched=true
+                                    end
+                                elseif rname=="CreateProjectile" then
+                                    if argc>=19 then
+                                        args[18]=part args[19]=part.Position args[17]=part.Position
+                                        args[4]=part.CFrame args[10]=part.Position args[3]=part.Position
+                                        patched=true
+                                    end
+                                end
+                            end)
+                            if patched then
+                                ARS.SilentHits=(ARS.SilentHits or 0)+1
+                                ARS.SilentLast=os.clock()
+                                return ARS.silentOld(self, table.unpack(args))
+                            end
+                        end
+                    end
+                end
+            end
+            return ARS.silentOld(self, ...)
+        end))
+    end)
+    if ok and ARS.silentOld ~= nil then notify("Arsenal", "silent hook ready")
+    else notify("Arsenal", "silent hook failed") end
+end
+
 -- KEYBINDS WINDOW (Misc toggle; live names via kb.refresh)
 do
     local w=Instance.new("Frame")
@@ -1236,6 +1373,22 @@ kb.refresh()
 
 -- ARSENAL TAB (arsenal file only: gun mods, hitbox expander)
 local ao=1
+pageHeader(arsPage,ao,"Silent Aim") ao=ao+1
+do local r=newRow(arsPage,ao); ao=ao+1
+    createToggle(r,1,"SilentEnabled","Silent Aim",false,function(v) ARS.SilentEnabled=v if v then installSilent(true) end end,0.5,-3)
+    createToggle(r,2,"SilentTeam","Team Check",true,function(v) ARS.SilentTeam=v end,0.5,-3)
+end
+createDropdown(arsPage,ao,"SilentPart","Target Part",{"Hitbox","Head","HRP"},ARS.SilentPart,function(v) ARS.SilentPart=v end) ao=ao+1
+createSlider(arsPage,ao,"SilentFOV","Silent FOV",40,300,ARS.SilentFOV,function(v) ARS.SilentFOV=v end) ao=ao+1
+createSlider(arsPage,ao,"SilentChance","Hit Chance",10,100,ARS.SilentChance,function(v) ARS.SilentChance=v end) ao=ao+1
+createToggle(arsPage,ao,"SilentWall","Wall Check",true,function(v) ARS.SilentWall=v end) ao=ao+1
+do
+    local info=Instance.new("TextLabel")
+    info.LayoutOrder=ao ao=ao+1 info.Size=UDim2.new(1,-4,0,30)
+    info.BackgroundTransparency=1 info.Text="Redirects Arsenal bullet remotes to the closest enemy Hitbox. Needs hook API."
+    info.Font=Enum.Font.Gotham info.TextSize=11 info.TextColor3=THEME.TextDim
+    info.TextWrapped=true info.Parent=arsPage
+end
 pageHeader(arsPage,ao,"Gun Mods") ao=ao+1
 do local r=newRow(arsPage,ao); ao=ao+1
     createToggle(r,1,"NoSpread","No Spread",false,function(v) ARS.NoSpread=v if v then applyGunMods() end end,0.5,-3)
@@ -1347,9 +1500,14 @@ function saveConfig()
         FOV=Settings.FOV, ShowFOV=Settings.ShowFOV, Smoothing=Settings.Smoothing,
         Target=Settings.Target, Priority=Settings.Priority, AimTeamCheck=Settings.AimTeamCheck,
         WallCheck=Settings.WallCheck, NoKnock=Settings.NoKnock, AFKProtect=Settings.AFKProtect,
+        Ragebot=Settings.Ragebot, RageFOV=Settings.RageFOV, RageSmooth=Settings.RageSmooth,
+        RageReact=Settings.RageReact, Recoil=Settings.Recoil, RecoilX=Settings.RecoilX,
+        RecoilY=Settings.RecoilY, NoSnap=Settings.NoSnap,
         Chams=Settings.Chams, AimLock=Settings.AimLock, Crosshair=Util.Crosshair,
         HealthBar=Settings.HealthBar, Prediction=Settings.Prediction,
         Keybinds=kb.on, FPSCap=Settings.FPSCap, FPSOverlay=Settings.FPSOverlay,
+        SilentEnabled=ARS.SilentEnabled, SilentTeam=ARS.SilentTeam, SilentPart=ARS.SilentPart,
+        SilentFOV=ARS.SilentFOV, SilentChance=ARS.SilentChance, SilentWall=ARS.SilentWall,
         NoSpread=ARS.NoSpread, NoRecoil=ARS.NoRecoil, RapidFire=ARS.RapidFire,
         FastReload=ARS.FastReload, FullAuto=ARS.FullAuto,
         HitboxExpand=ARS.HitboxExpand, HitboxSize=ARS.HitboxSize,
@@ -1378,7 +1536,9 @@ function loadConfig()
     for _, id in ipairs({"ESPEnabled","Boxes","Names","Distance","TeamCheck","MaxESP","OverlayY","Inventory","Tracers",
         "AimEnabled","AimMethod","AimMode","FOV","ShowFOV","Smoothing","Target","Priority",
         "AimTeamCheck","WallCheck","NoKnock","AFKProtect","MaxDistance",
+        "Ragebot","RageFOV","RageSmooth","RageReact","Recoil","RecoilX","RecoilY","NoSnap",
         "Chams","AimLock","Crosshair","HealthBar","Prediction","Keybinds","FPSCap","FPSOverlay",
+        "SilentEnabled","SilentTeam","SilentPart","SilentFOV","SilentChance","SilentWall",
         "NoSpread","NoRecoil","RapidFire","FastReload","FullAuto","HitboxExpand","HitboxSize",
         "WalkSpeed","JumpPower","InfJump","Fly","FlySpeed","Noclip","Fullbright","CamFOV","ClickTP"}) do
         apply(id, data[id])
@@ -1513,6 +1673,11 @@ local function Unload()
     pcall(function() if Util.Fly then Util.Fly=false stopFly() end end)
     pcall(function() if Util.Fullbright then Util.Fullbright=false setFullbright(false) end end)
     pcall(function() ARS.HitboxExpand=false applyHitboxes() end)
+    if ARS.silentOld ~= nil then
+        pcall(hookmetamethod, game, "__namecall", ARS.silentOld)
+        ARS.silentOld=nil
+    end
+    ARS.SilentEnabled=false
     for _,c in ipairs(Conns) do pcall(function() c:Disconnect() end) end
     pcall(function() for p,_ in pairs(ESPData) do clearESP(p) end end)
     pcall(function()
@@ -1953,6 +2118,37 @@ renderConn=track(RunService.RenderStepped:Connect(function()
         end
     else
         lockedPlayer=nil
+    end
+    if not ESP_ONLY and Settings.Ragebot and not Unloaded and myHrp then
+        local sF, sT, sP = Settings.FOV, Settings.Target, Settings.Priority
+        Settings.FOV, Settings.Target, Settings.Priority = Settings.RageFOV, "Head", "Closest"
+        local wp,pl = findTarget(cam,mousePos,myHrp)
+        Settings.FOV, Settings.Target, Settings.Priority = sF, sT, sP
+        local gated=false
+        if pl ~= Rage.lastPl then
+            if nowC - (Rage.lastT or 0) < Settings.RageReact/1000 then gated=true
+            else Rage.lastPl=pl Rage.lastT=nowC end
+        end
+        if wp and not gated then
+            local f=1/math.max(1,Settings.RageSmooth)
+            if Settings.NoSnap then f=math.min(f,0.4) end
+            local goal=CFrame.new(cam.CFrame.Position,wp)
+            cam.CFrame=cam.CFrame:Lerp(goal,math.clamp(f,0.05,1))
+        end
+        if pl==nil then Rage.lastPl=nil end
+    end
+    if not ESP_ONLY and Settings.Recoil and not Unloaded then
+        local firing=false
+        pcall(function() firing = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) end)
+        if firing then
+            if hasMouseMove then
+                local dx=(Settings.RecoilX or 0)/100*2
+                local dy=(Settings.RecoilY or 0)/100*3
+                if dx~=0 or dy~=0 then pcall(function() mousemoverel(dx,dy) end) end
+            elseif not mouseWarned then
+                mouseWarned=true warn("[Recoil] mousemoverel missing")
+            end
+        end
     end
 end))
 
