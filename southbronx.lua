@@ -424,7 +424,7 @@ do -- soft drop shadow + accent hairline
     sh.Size=UDim2.new(1,24,1,24) sh.Position=UDim2.new(0,-12,0,-10)
     sh.Image="rbxassetid://5554236805" sh.ImageColor3=Color3.new(0,0,0)
     sh.ImageTransparency=0.55 sh.ScaleType=Enum.ScaleType.Slice
-    sh.SliceCenter=RectOffset.new(96,96,96,96) sh.ZIndex=-1 sh.Parent=main
+    sh.SliceCenter=RectOffset.new(96,96,96,96) sh.Parent=main
     local top=Instance.new("Frame")
     top.Size=UDim2.new(1,-32,0,2) top.Position=UDim2.new(0,16,0,0)
     top.BackgroundColor3=THEME.Accent top.BorderSizePixel=0 top.Active=false top.ZIndex=2 top.Parent=main
@@ -500,7 +500,7 @@ navList.Padding=UDim.new(0,8) navList.SortOrder=Enum.SortOrder.LayoutOrder navLi
 local function mkNavBtn(name, order)
     local b=Instance.new("TextButton")
     b.LayoutOrder=order b.Size=UDim2.new(1,0,0,38)
-    b.Text="  "..name b.Font=Enum.Font.GothamSemibold b.TextSize=14
+    b.Text="  "..name b.Font=Enum.Font.GothamBold b.TextSize=14
     b.TextXAlignment=Enum.TextXAlignment.Left
     b.AutoButtonColor=false b.Active=true b.Parent=nav
     local c=Instance.new("UICorner") c.CornerRadius=UDim.new(0,11) c.Parent=b
@@ -642,7 +642,7 @@ end
 local function createToggle(parent,order,id,name,default,cb,scale,off)
     local btn=Instance.new("TextButton")
     btn.LayoutOrder=order btn.Size=UDim2.new(scale or 1,off or -4,0,30)
-    btn.Font=Enum.Font.GothamSemibold btn.TextSize=13 btn.AutoButtonColor=false btn.Active=true btn.Parent=parent
+    btn.Font=Enum.Font.GothamBold btn.TextSize=13 btn.AutoButtonColor=false btn.Active=true btn.Parent=parent
     local c=Instance.new("UICorner") c.CornerRadius=UDim.new(0,9) c.Parent=btn
     local s=Instance.new("UIStroke") s.Color=THEME.Stroke s.Transparency=0.6 s.Thickness=1 s.Parent=btn
     local sc=Instance.new("UIScale") sc.Scale=1 sc.Parent=btn
@@ -686,7 +686,7 @@ local function createSlider(parent,order,id,name,min,max,default,cb,accent)
     local s=Instance.new("UIStroke") s.Color=THEME.Stroke s.Transparency=0.6 s.Thickness=1 s.Parent=f
     local lbl=Instance.new("TextLabel")
     lbl.Size=UDim2.new(1,-12,0,18) lbl.Position=UDim2.new(0,7,0,3)
-    lbl.BackgroundTransparency=1 lbl.Font=Enum.Font.GothamSemibold lbl.TextSize=12
+    lbl.BackgroundTransparency=1 lbl.Font=Enum.Font.GothamBold lbl.TextSize=12
     lbl.TextColor3=THEME.TextDim lbl.TextXAlignment=Enum.TextXAlignment.Left lbl.Parent=f
     local val=Instance.new("TextLabel")
     val.Size=UDim2.new(0,70,0,18) val.Position=UDim2.new(1,-77,0,3)
