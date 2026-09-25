@@ -277,7 +277,34 @@ local function notify(title, text, ms)
         return fr
     end)
     if not ok or not f then return end
-    task.delay(ms/1000, function() pcall(function() f:Destroy() end) end)
+    pcall(function()
+        local ts=game:GetService("TweenService")
+        local ti=TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        f.BackgroundTransparency=1
+        ts:Create(f, ti, {BackgroundTransparency=0}):Play()
+        for _,d in ipairs(f:GetChildren()) do
+            if d:IsA("TextLabel") then
+                d.TextTransparency=1
+                ts:Create(d, ti, {TextTransparency=0}):Play()
+            elseif d:IsA("Frame") then
+                d.BackgroundTransparency=1
+                ts:Create(d, ti, {BackgroundTransparency=0}):Play()
+            end
+        end
+    end)
+    task.delay(ms/1000, function()
+        pcall(function()
+            local ts=game:GetService("TweenService")
+            local ti=TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+            ts:Create(f, ti, {BackgroundTransparency=1}):Play()
+            for _,d in ipairs(f:GetChildren()) do
+                if d:IsA("TextLabel") then ts:Create(d, ti, {TextTransparency=1}):Play()
+                elseif d:IsA("Frame") then ts:Create(d, ti, {BackgroundTransparency=1}):Play() end
+            end
+        end)
+        task.wait(0.22)
+        pcall(function() f:Destroy() end)
+    end)
 end
 
 local keyFrame=nil local keyBox=nil local keyMsg=nil
@@ -395,6 +422,7 @@ main.BackgroundColor3=THEME.BG main.BorderSizePixel=0
 main.Active=false main.Draggable=false main.ClipsDescendants=true
 main.Visible=false main.Parent=gui
 local mc=Instance.new("UICorner") mc.CornerRadius=UDim.new(0,14) mc.Parent=main
+do local sc=Instance.new("UIScale") sc.Scale=1 sc.Parent=main end
 local ms=Instance.new("UIStroke") ms.Color=THEME.Stroke ms.Thickness=1 ms.Parent=main
 
 local side=Instance.new("Frame")
@@ -519,6 +547,11 @@ local function setTab(w)
     espPage.Visible=(w=="ESP") aimPage.Visible=(w=="Aim") miscPage.Visible=(w=="Misc") utilPage.Visible=(w=="Util") arsPage.Visible=(w=="Ars")
     espPage.CanvasPosition=Vector2.new(0,0) aimPage.CanvasPosition=Vector2.new(0,0) miscPage.CanvasPosition=Vector2.new(0,0) utilPage.CanvasPosition=Vector2.new(0,0) arsPage.CanvasPosition=Vector2.new(0,0)
     paintNav(w)
+    pcall(function()
+        local ts=game:GetService("TweenService")
+        content.Position=UDim2.new(0,192,0,14)
+        ts:Create(content, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position=UDim2.new(0,184,0,14)}):Play()
+    end)
 end
 navESP.MouseButton1Click:Connect(function() setTab("ESP") end)
 navAim.MouseButton1Click:Connect(function() setTab("Aim") end)
@@ -668,7 +701,11 @@ local function createDropdown(parent,order,id,title,options,current,cb)
         else
             if openDropClose and openDropClose~=close then pcall(openDropClose) end
             list.Visible=true
-            f.Size=UDim2.new(1,-4,0,closedH+gap+listH)
+            local okT=pcall(function()
+                local ts=game:GetService("TweenService")
+                ts:Create(f, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size=UDim2.new(1,-4,0,closedH+gap+listH)}):Play()
+            end)
+            if not okT then f.Size=UDim2.new(1,-4,0,closedH+gap+listH) end
             main.Text=title..":  "..current.."  ▴"
             openDropClose=close
         end
@@ -1752,11 +1789,14 @@ local function createESP(player)
     label.TextXAlignment=Enum.TextXAlignment.Center
     label.Text="" label.TextColor3=Settings.Color label.Parent=nameGui
     local hpBG=Instance.new("Frame")
-    hpBG.Size=UDim2.new(0,120,0,6) hpBG.Position=UDim2.new(0.5,-60,1,-8)
-    hpBG.BackgroundColor3=Color3.fromRGB(20,20,25) hpBG.BorderSizePixel=0 hpBG.Active=false hpBG.Visible=false hpBG.Parent=nameGui
-    do local hpBGC=Instance.new("UICorner") hpBGC.CornerRadius=UDim.new(0,3) hpBGC.Parent=hpBG end
+    hpBG.Name="NovaHP"
+    hpBG.Size=UDim2.new(0,4,1,0) hpBG.Position=UDim2.new(0,-7,0,0)
+    hpBG.BackgroundColor3=Color3.fromRGB(20,20,25) hpBG.BorderSizePixel=0 hpBG.Active=false hpBG.Visible=false hpBG.Parent=boxGui
+    pcall(function() hpBG:SetAttribute("nx",1) end)
+    do local hpBGC=Instance.new("UICorner") hpBGC.CornerRadius=UDim.new(0,2) hpBGC.Parent=hpBG end
     local hpFill=Instance.new("Frame")
-    hpFill.Size=UDim2.new(1,0,1,0) hpFill.BackgroundColor3=Color3.fromRGB(80,255,120)
+    hpFill.AnchorPoint=Vector2.new(0,1) hpFill.Size=UDim2.new(1,0,1,0) hpFill.Position=UDim2.new(0,0,1,0)
+    hpFill.BackgroundColor3=Color3.fromRGB(80,255,120)
     hpFill.BorderSizePixel=0 hpFill.Active=false hpFill.Parent=hpBG
     local cham=Instance.new("Highlight")
     cham.Name="NovaCham" cham.Adornee=char cham.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
@@ -2193,8 +2233,8 @@ renderConn=track(RunService.RenderStepped:Connect(function()
                 end
                 if show and Settings.TeamCheck and player.Team~=nil and myTeam~=nil and player.Team==myTeam then show=false end
                 local okP = pcall(function()
-                    d.boxGui.Enabled=show and boxesOn
-                    d.nameGui.Enabled=show and (Settings.Names or Settings.Distance or Settings.HealthBar)
+                    d.boxGui.Enabled=show and (boxesOn or Settings.HealthBar)
+                    d.nameGui.Enabled=show and (Settings.Names or Settings.Distance)
                     if d.stroke.Color~=col then d.stroke.Color=col end
                     if d.cham then
                         if d.cham.FillColor~=col then d.cham.FillColor=col end
@@ -2207,7 +2247,7 @@ renderConn=track(RunService.RenderStepped:Connect(function()
                         if d.nameLabel.TextColor3~=col then d.nameLabel.TextColor3=col end
                         if Settings.HealthBar and d.hpFill then
                             local frac=math.clamp(hum.Health/math.max(1,hum.MaxHealth),0,1)
-                            d.hpFill.Size=UDim2.new(frac,0,1,0)
+                            d.hpFill.Size=UDim2.new(1,0,frac,0)
                             d.hpFill.BackgroundColor3=Color3.fromRGB(math.floor(255*(1-frac)),math.floor(255*frac),60)
                         end
                     elseif show and d.nameLabel.TextColor3~=col then
@@ -2301,7 +2341,20 @@ track(UserInputService.InputBegan:Connect(function(inp,gpe)
         return
     end
     if gpe then return end
-    if keyMatches(Settings.MenuKey, inp) then main.Visible=not main.Visible return end
+    if keyMatches(Settings.MenuKey, inp) then
+        main.Visible=not main.Visible
+        if main.Visible then
+            pcall(function()
+                local sc=main:FindFirstChildOfClass("UIScale")
+                local ts=game:GetService("TweenService")
+                if sc and ts then
+                    sc.Scale=0.94
+                    ts:Create(sc, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale=1}):Play()
+                end
+            end)
+        end
+        return
+    end
     if Settings.AimMode=="Toggle" and Settings.AimEnabled and keyMatches(Settings.AimKey, inp) then
         aimingOn=not aimingOn
     end
