@@ -442,7 +442,7 @@ end
 local head=Instance.new("Frame")
 head.Size=UDim2.new(1,0,0,86) head.BackgroundTransparency=1 head.Active=true head.Parent=side
 local w1=Instance.new("TextLabel")
-w1.Size=UDim2.new(1,-14,0,14) w1.Position=UDim2.new(0,7,0,12)
+w1.Size=UDim2.new(1,-26,0,14) w1.Position=UDim2.new(0,19,0,12)
 w1.BackgroundTransparency=1 w1.Text="N O V A  H U B" w1.Font=Enum.Font.GothamMedium
 w1.TextSize=10 w1.TextColor3=THEME.TextDim w1.TextXAlignment=Enum.TextXAlignment.Left w1.Parent=head
 do local dot=Instance.new("Frame")
@@ -501,6 +501,7 @@ local function mkNavBtn(name, order)
     b.Text="  "..name b.Font=Enum.Font.GothamBold b.TextSize=14
     b.TextXAlignment=Enum.TextXAlignment.Left
     b.AutoButtonColor=false b.Active=true b.Parent=nav
+    do local np=Instance.new("UIPadding") np.PaddingLeft=UDim.new(0,12) np.Parent=b end
     local c=Instance.new("UICorner") c.CornerRadius=UDim.new(0,11) c.Parent=b
     local s=Instance.new("UIStroke") s.Name="NavStroke" s.Color=THEME.Stroke s.Transparency=0.5 s.Thickness=1 s.Parent=b
     do -- active marker
@@ -580,7 +581,7 @@ local function paintNav(which)
     local function st(b,on)
         local mk=b:FindFirstChild("NavMarker") local sr=b:FindFirstChild("NavStroke")
         if on then
-            b.BackgroundColor3=Color3.fromRGB(58,44,112) b.TextColor3=Color3.new(1,1,1)
+            b.BackgroundColor3=THEME.Accent b.TextColor3=Color3.new(1,1,1)
             if mk then mk.Visible=true end
             if sr then sr.Color=THEME.Accent sr.Transparency=0 end
         else
