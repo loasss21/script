@@ -52,7 +52,7 @@ local Settings = {
     AimTeamCheck = true, WallCheck = true, NoKnock = true,
     TrigEnabled = false, TrigMode = "Always", TrigTarget = "Any",
     TrigTeamCheck = true, TrigNoKnock = true, TrigDelay = 120,
-    MaxDistance = 1000, AFKProtect = true, FPSCap = 60,
+    MaxDistance = 1000, AFKProtect = true, FPSCap = 60, FPSOverlay = true,
     PanicKey = {Type="Key", Key=Enum.KeyCode.Delete, Name="Delete"},
     MenuKey = {Type="Key", Key=Enum.KeyCode.RightShift, Name="RightShift"},
 }
@@ -122,7 +122,7 @@ local aimingOn = false
 local trigAcquireT = 0
 local lockedPlayer = nil
 local trigMsgLbl = nil
-local kb = {win=nil, lines={}, on=true}
+local kb = {win=nil, lines={}, on=false}
 local fpsAcc, fpsShown, fpsClock = 0, 60, os.clock()
 local openDropClose = nil
 -- runtime caches: avoid per-frame GetPlayers() alloc + per-label Backpack scans
@@ -227,6 +227,21 @@ do
     v.BackgroundColor3=Color3.new(1,1,1) v.BorderSizePixel=0
     v.Visible=false v.Active=false v.Parent=overlayGui
     cross.H, cross.V = h, v
+end
+local perfHud = {}
+do
+    local tag=Instance.new("TextLabel")
+    tag.Name="NovaPerf" tag.AnchorPoint=Vector2.new(1,0) tag.Position=UDim2.new(1,-12,0,10)
+    tag.Size=UDim2.new(0,230,0,22) tag.BackgroundColor3=THEME.BG tag.BackgroundTransparency=0.15
+    tag.BorderSizePixel=0 tag.Font=Enum.Font.GothamBold tag.TextSize=12
+    tag.TextColor3=Color3.new(1,1,1) tag.Text="NOVA v7.0" tag.TextXAlignment=Enum.TextXAlignment.Right
+    tag.Visible=true tag.Active=false tag.Parent=overlayGui
+    pcall(function() tag:SetAttribute("nx",1) end)
+    local tc=Instance.new("UICorner") tc.CornerRadius=UDim.new(0,8) tc.Parent=tag
+    local ts=Instance.new("UIStroke") ts.Color=THEME.Stroke ts.Thickness=1 ts.Parent=tag
+    local pad=Instance.new("UIPadding")
+    pad.PaddingRight=UDim.new(0,10) pad.Parent=tag
+    perfHud.label=tag
 end
 
 local gui = Instance.new("ScreenGui")
@@ -529,12 +544,18 @@ local function regHandle(id, setFn)
     UIHandles[id]=setFn
 end
 local function pageHeader(parent, order, text)
+    local wrap=Instance.new("Frame")
+    wrap.LayoutOrder=order wrap.Size=UDim2.new(1,-4,0,30)
+    wrap.BackgroundTransparency=1 wrap.Parent=parent
     local t=Instance.new("TextLabel")
-    t.LayoutOrder=order t.Size=UDim2.new(1,-4,0,26)
-    t.BackgroundTransparency=1 t.Text=text t.Font=Enum.Font.GothamBold
-    t.TextSize=16 t.TextColor3=Color3.new(1,1,1)
-    t.TextXAlignment=Enum.TextXAlignment.Left t.Parent=parent
-    return t
+    t.Size=UDim2.new(1,0,0,22) t.BackgroundTransparency=1 t.Text=text
+    t.Font=Enum.Font.GothamBold t.TextSize=16 t.TextColor3=Color3.new(1,1,1)
+    t.TextXAlignment=Enum.TextXAlignment.Left t.Parent=wrap
+    local bar=Instance.new("Frame")
+    bar.Size=UDim2.new(0,44,0,2) bar.Position=UDim2.new(0,1,0,24)
+    bar.BackgroundColor3=THEME.Accent bar.BorderSizePixel=0 bar.Active=false bar.Parent=wrap
+    local bc=Instance.new("UICorner") bc.CornerRadius=UDim.new(1,0) bc.Parent=bar
+    return wrap
 end
 local function newRow(parent, order, h)
     local r=Instance.new("Frame")
@@ -1391,7 +1412,8 @@ perfLbl.TextSize=12 perfLbl.TextColor3=THEME.TextDim perfLbl.TextXAlignment=Enum
 createKeyPicker(miscPage,mo,"PanicKey","Panic Key","Delete",function(d) Settings.PanicKey=d kb.refresh() end) mo=mo+1
 createKeyPicker(miscPage,mo,"MenuKey","Menu Key","RightShift",function(d) Settings.MenuKey=d kb.refresh() pcall(function() hintLbl.Text=(d.Name or "?")..": menu" end) end) mo=mo+1
 createToggle(miscPage,mo,"AFKProtect","Anti-AFK",true,function(v) Settings.AFKProtect=v end) mo=mo+1
-createToggle(miscPage,mo,"Keybinds","Keybinds Window",true,function(v) kb.on=v if kb.win then kb.win.Visible=v end end) mo=mo+1
+createToggle(miscPage,mo,"Keybinds","Keybinds Window",false,function(v) kb.on=v if kb.win then kb.win.Visible=v end end) mo=mo+1
+createToggle(miscPage,mo,"FPSOverlay","FPS Overlay",true,function(v) Settings.FPSOverlay=v if perfHud.label then perfHud.label.Visible=v end end) mo=mo+1
 createSlider(miscPage,mo,"FPSCap","FPS Cap",30,240,Settings.FPSCap,function(v) Settings.FPSCap=v pcall(function() if typeof(setfpscap)=="function" then setfpscap(v) end end) end) mo=mo+1
 local cfgNameLbl=Instance.new("TextLabel")
 cfgNameLbl.LayoutOrder=mo mo=mo+1 cfgNameLbl.Size=UDim2.new(1,-4,0,16) cfgNameLbl.BackgroundTransparency=1
@@ -1474,7 +1496,7 @@ function saveConfig()
         TrigDelay=Settings.TrigDelay,
         Chams=Settings.Chams, AimLock=Settings.AimLock, Crosshair=Util.Crosshair,
         HealthBar=Settings.HealthBar, Prediction=Settings.Prediction, SilentChance=Settings.SilentChance,
-        Keybinds=kb.on, FPSCap=Settings.FPSCap,
+        Keybinds=kb.on, FPSCap=Settings.FPSCap, FPSOverlay=Settings.FPSOverlay,
         MaxDistance=Settings.MaxDistance,
         WalkSpeed=Util.WalkSpeed, JumpPower=Util.JumpPower, InfJump=Util.InfJump,
         Fly=Util.Fly, FlySpeed=Util.FlySpeed, Noclip=Util.Noclip,
@@ -1501,7 +1523,7 @@ function loadConfig()
         "AimEnabled","AimMethod","AimMode","FOV","ShowFOV","Smoothing","Target","Priority",
         "AimTeamCheck","WallCheck","NoKnock","AFKProtect","MaxDistance",
         "TrigEnabled","TrigMode","TrigTarget","TrigTeamCheck","TrigNoKnock","TrigDelay",
-        "Chams","AimLock","Crosshair","HealthBar","Prediction","SilentChance","Keybinds","FPSCap",
+        "Chams","AimLock","Crosshair","HealthBar","Prediction","SilentChance","Keybinds","FPSCap","FPSOverlay",
         "WalkSpeed","JumpPower","InfJump","Fly","FlySpeed","Noclip","Fullbright","CamFOV","ClickTP"}) do
         apply(id, data[id])
     end
@@ -2230,6 +2252,12 @@ renderConn=track(RunService.RenderStepped:Connect(function()
         fpsShown=fpsAcc fpsAcc=0 fpsClock=nowC
         pcall(function()
             perfLbl.Text="FPS: "..fpsShown.." • Players: "..#cachedPlayers
+            if perfHud.label then
+                perfHud.label.Visible=Settings.FPSOverlay
+                if Settings.FPSOverlay then
+                    perfHud.label.Text="NOVA v7.0  •  "..fpsShown.." FPS"
+                end
+            end
         end)
     end
     if doOverlay then
@@ -2303,6 +2331,7 @@ local function finishLoading()
     print("[NOVA] v7.0 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
     pcall(function() loading:Destroy() end)
     pcall(function() main.Visible=true end)
+    notify("NOVA", "loaded  •  "..GAME_VERSION)
     refreshPlayers()
     for _,p in ipairs(cachedPlayers) do
         if p~=LocalPlayer and p.Character then task.spawn(createESP,p) end

@@ -18,6 +18,8 @@ Triggerbot raycast via PlayerMouse + ScreenPointToRay (geen inset-math), met eig
 
 Aimbot-methode Silent stuurt schoten stil bij via Mouse.Hit-hook en/of Raycast-redirect (beide met hit chance, team/wall-checks); Arsenal heeft daarnaast remote-patching met redirect-teller in de statusregel.
 
+HUD rechtsboven toont NOVA + FPS (toggle in Misc). Keybinds-window staat standaard uit, zet aan via Misc.
+
 ## Usage (executor)
 
 ```lua
