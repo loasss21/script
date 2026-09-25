@@ -33,14 +33,14 @@ local FILE_TAG = "single"
 print("[NOVA] v7.0 | game=" .. GAME_VERSION .. " place=" .. tostring(detectedPlace) .. " universe=" .. tostring(detectedUniverse))
 
 local THEME = {
-    BG = Color3.fromRGB(13,13,18),
-    Panel = Color3.fromRGB(21,21,29),
-    Item = Color3.fromRGB(30,30,43),
-    Hover = Color3.fromRGB(41,41,58),
-    Stroke = Color3.fromRGB(62,62,88),
-    Accent = Color3.fromRGB(132,99,255),
-    AccentSoft = Color3.fromRGB(158,132,255),
-    TextDim = Color3.fromRGB(168,168,186),
+    BG = Color3.fromRGB(10,12,18),
+    Panel = Color3.fromRGB(20,23,31),
+    Item = Color3.fromRGB(28,33,44),
+    Hover = Color3.fromRGB(38,44,58),
+    Stroke = Color3.fromRGB(48,54,72),
+    Accent = Color3.fromRGB(255,93,93),
+    AccentSoft = Color3.fromRGB(255,150,150),
+    TextDim = Color3.fromRGB(150,156,178),
 }
 
 local Settings = {
@@ -411,7 +411,7 @@ local main=Instance.new("Frame")
 main.AnchorPoint=Vector2.new(0.5,0.5) main.Position=UDim2.new(0.5,0,0.5,0)
 main.Size=UDim2.new(0,620,0,440)
 main.BackgroundColor3=THEME.BG main.BorderSizePixel=0
-main.Active=false main.Draggable=false main.ClipsDescendants=true
+main.Active=false main.Draggable=false main.ClipsDescendants=false
 main.Visible=false main.Parent=gui
 local mc=Instance.new("UICorner") mc.CornerRadius=UDim.new(0,16) mc.Parent=main
 do local sc=Instance.new("UIScale") sc.Scale=1 sc.Parent=main end
@@ -502,14 +502,14 @@ local function mkNavBtn(name, order)
     b.TextXAlignment=Enum.TextXAlignment.Left
     b.AutoButtonColor=false b.Active=true b.Parent=nav
     local c=Instance.new("UICorner") c.CornerRadius=UDim.new(0,11) c.Parent=b
-    local s=Instance.new("UIStroke") s.Color=THEME.Stroke s.Transparency=0.5 s.Thickness=1 s.Parent=b
+    local s=Instance.new("UIStroke") s.Name="NavStroke" s.Color=THEME.Stroke s.Transparency=0.5 s.Thickness=1 s.Parent=b
     do -- active marker
         local mk=Instance.new("Frame")
+        mk.Name="NavMarker"
         mk.Size=UDim2.new(0,3,0,16) mk.Position=UDim2.new(0,5,0.5,-8)
         mk.BackgroundColor3=THEME.Accent mk.BorderSizePixel=0 mk.Active=false
         mk.Visible=false mk.Parent=b
         local mc=Instance.new("UICorner") mc.CornerRadius=UDim.new(1,0) mc.Parent=mk
-        b:SetAttribute("mk",mk) b:SetAttribute("stroke",s)
     end
     b.MouseEnter:Connect(function()
         if b.BackgroundColor3==THEME.Item then b.BackgroundColor3=THEME.Hover end
@@ -554,7 +554,9 @@ hintLbl.Font=Enum.Font.Gotham hintLbl.TextSize=12 hintLbl.TextColor3=THEME.TextD
 
 local content=Instance.new("Frame")
 content.Position=UDim2.new(0,184,0,14) content.Size=UDim2.new(1,-198,1,-28)
-content.BackgroundTransparency=1 content.Parent=main
+content.BackgroundColor3=THEME.Panel content.BorderSizePixel=0 content.Parent=main
+do local cc=Instance.new("UICorner") cc.CornerRadius=UDim.new(0,12) cc.Parent=content end
+do local cs=Instance.new("UIStroke") cs.Color=THEME.Stroke cs.Transparency=0.6 cs.Thickness=1 cs.Parent=content end
 
 local function mkPage()
     local p=Instance.new("ScrollingFrame")
@@ -576,7 +578,7 @@ aimPage.Visible=false miscPage.Visible=false utilPage.Visible=false
 
 local function paintNav(which)
     local function st(b,on)
-        local mk=b:GetAttribute("mk") local sr=b:GetAttribute("stroke")
+        local mk=b:FindFirstChild("NavMarker") local sr=b:FindFirstChild("NavStroke")
         if on then
             b.BackgroundColor3=Color3.fromRGB(58,44,112) b.TextColor3=Color3.new(1,1,1)
             if mk then mk.Visible=true end
