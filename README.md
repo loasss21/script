@@ -12,7 +12,7 @@ Roblox script: ESP / Aimbot / Misc / Utility (+ Farm-tab in South Bronx: The Tre
 
 ## Tabs
 
-ESP (chams, health bar) / Aimbot (Camera + Mouse, target lock, prediction) / Rage (ragebot, recoil control) / Misc (server hop, keybinds window, FPS cap/overlay, copy JobId/PlaceId) / Utility (crosshair) / Arsenal-tab alleen in `arsenal.lua` (silent aim, gun mods, hitbox expander) / Farm-tab alleen in `southbronx.lua`.
+ESP (chams, health bar) / Aimbot (Camera + Mouse, target lock, prediction) / Rage (sub-tabs: Ragebot, Triggerbot, Recoil) / Misc (server hop, keybinds window, FPS cap/overlay, copy JobId/PlaceId) / Utility (crosshair) / Arsenal-tab alleen in `arsenal.lua` (silent aim, gun mods, hitbox expander) / Farm-tab alleen in `southbronx.lua`.
 
 Triggerbot is verwijderd. Sidebar heeft een Discord-knop (vervang `https://discord.gg/REPLACE-ME` in de `discBtn` handler door je invite-link).
 

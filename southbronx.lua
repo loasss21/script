@@ -54,6 +54,8 @@ local Settings = {
     AimTeamCheck = true, WallCheck = true, NoKnock = true,
     Ragebot = false, RageFOV = 300, RageSmooth = 2, RageReact = 120,
     Recoil = false, RecoilX = 60, RecoilY = 90, NoSnap = true,
+    TrigEnabled = false, TrigMode = "Always", TrigTarget = "Any",
+    TrigTeamCheck = true, TrigNoKnock = true, TrigDelay = 120,
     MaxDistance = 1000, AFKProtect = true, FPSCap = 60, FPSOverlay = true,
     PanicKey = {Type="Key", Key=Enum.KeyCode.Delete, Name="Delete"},
     MenuKey = {Type="Key", Key=Enum.KeyCode.RightShift, Name="RightShift"},
@@ -100,6 +102,19 @@ local UIHandles = {}
 local lastAttempt = {}
 local creating = {}
 local function track(c) table.insert(Conns,c) return c end
+local vimSvc = nil
+pcall(function() vimSvc = game:GetService("VirtualInputManager") end)
+local function fireClick(x, y)
+    if typeof(mouse1click)=="function" then pcall(mouse1click) return "mouse" end
+    if vimSvc then
+        local ok=pcall(function() vimSvc:SendMouseButtonEvent(x, y, 0, true, game, 1) end)
+        pcall(function() vimSvc:SendMouseButtonEvent(x, y, 0, false, game, 1) end)
+        if ok then return "vim" end
+    end
+    local tool=LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+    if tool then pcall(function() tool:Activate() end) return "tool" end
+    return nil
+end
 local hasMouseMove = typeof(mousemoverel) == "function"
 local canFile = typeof(writefile) == "function" and typeof(readfile) == "function" and typeof(isfile) == "function"
 local mouseWarned = false
@@ -108,7 +123,7 @@ local lastFOV = -1
 local aimingOn = false
 local lockedPlayer = nil
 local kb = {win=nil, lines={}, on=false}
-local Rage = {lastPl=nil, lastT=0}
+local Rage = {lastPl=nil, lastT=0, trigAcq=0, trigT=0, trigLbl=nil}
 local fpsAcc, fpsShown, fpsClock = 0, 60, os.clock()
 local openDropClose = nil
 -- runtime caches: avoid per-frame GetPlayers() alloc + per-label Backpack scans
@@ -653,13 +668,21 @@ local function createToggle(parent,order,id,name,default,cb,scale,off)
     local sc=Instance.new("UIScale") sc.Scale=1 sc.Parent=btn
     local on=default
     local function upd()
+        local target,tcol,scol,strans
         if on then
-            btn.Text=name..":  ON" btn.BackgroundColor3=THEME.Accent btn.TextColor3=Color3.new(1,1,1)
-            s.Color=THEME.AccentSoft s.Transparency=0
+            btn.Text=name..":  ON" tcol=Color3.new(1,1,1) target=THEME.Accent
+            scol=THEME.AccentSoft strans=0
         else
-            btn.Text=name..":  OFF" btn.BackgroundColor3=THEME.Item btn.TextColor3=THEME.TextDim
-            s.Color=THEME.Stroke s.Transparency=0.6
+            btn.Text=name..":  OFF" tcol=THEME.TextDim target=THEME.Item
+            scol=THEME.Stroke strans=0.6
         end
+        btn.TextColor3=tcol
+        local okT=pcall(function()
+            local ts=game:GetService("TweenService")
+            ts:Create(btn, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3=target}):Play()
+        end)
+        if not okT then btn.BackgroundColor3=target end
+        s.Color=scol s.Transparency=strans
     end
     local function set(v) on=(v==true) upd() cb(on) end
     btn.MouseEnter:Connect(function() if not on then btn.BackgroundColor3=THEME.Hover end end)
@@ -987,27 +1010,103 @@ end
 
 
 
--- RAGE TAB (standalone aggressive aim + recoil, hidden in ESP-only mode)
+-- RAGE TAB with sub-tabs (hidden in ESP-only mode)
 if not ESP_ONLY then
 local ra=1
 pageHeader(ragePage,ra,"Rage") ra=ra+1
 do local r=newRow(ragePage,ra); ra=ra+1
-    createToggle(r,1,"Ragebot","Ragebot",false,function(v) Settings.Ragebot=v end,0.5,-3)
-    createToggle(r,2,"NoSnap","No Snap",true,function(v) Settings.NoSnap=v end,0.5,-3)
-end
-createSlider(ragePage,ra,"RageFOV","Rage FOV",40,500,Settings.RageFOV,function(v) Settings.RageFOV=v end) ra=ra+1
-createSlider(ragePage,ra,"RageSmooth","Rage Smooth",1,10,Settings.RageSmooth,function(v) Settings.RageSmooth=v end) ra=ra+1
-createSlider(ragePage,ra,"RageReact","Reaction ms",0,500,Settings.RageReact,function(v) Settings.RageReact=v end) ra=ra+1
-pageHeader(ragePage,ra,"Recoil Control") ra=ra+1
-createToggle(ragePage,ra,"Recoil","Recoil Control",false,function(v) Settings.Recoil=v end) ra=ra+1
-createSlider(ragePage,ra,"RecoilX","X Strength",0,100,Settings.RecoilX,function(v) Settings.RecoilX=v end) ra=ra+1
-createSlider(ragePage,ra,"RecoilY","Y Strength",0,100,Settings.RecoilY,function(v) Settings.RecoilY=v end) ra=ra+1
-do
-    local info=Instance.new("TextLabel")
-    info.LayoutOrder=ra ra=ra+1 info.Size=UDim2.new(1,-4,0,30)
-    info.BackgroundTransparency=1 info.Text="Ragebot forces Head + Closest. Recoil works standalone while firing (hold LMB)."
-    info.Font=Enum.Font.Gotham info.TextSize=11 info.TextColor3=THEME.TextDim
-    info.TextWrapped=true info.Parent=ragePage
+    local b1=Instance.new("TextButton")
+    b1.LayoutOrder=1 b1.Size=UDim2.new(0.333,-4,0,28) b1.Text="RAGEBOT"
+    b1.Font=Enum.Font.GothamBold b1.TextSize=13 b1.AutoButtonColor=false b1.Active=true b1.Parent=r
+    local c1=Instance.new("UICorner") c1.CornerRadius=UDim.new(0,8) c1.Parent=b1
+    local b2=Instance.new("TextButton")
+    b2.LayoutOrder=2 b2.Size=UDim2.new(0.333,-4,0,28) b2.Text="TRIGGER"
+    b2.Font=Enum.Font.GothamBold b2.TextSize=13 b2.AutoButtonColor=false b2.Active=true b2.Parent=r
+    local c2=Instance.new("UICorner") c2.CornerRadius=UDim.new(0,8) c2.Parent=b2
+    local b3=Instance.new("TextButton")
+    b3.LayoutOrder=3 b3.Size=UDim2.new(0.333,-4,0,28) b3.Text="RECOIL"
+    b3.Font=Enum.Font.GothamBold b3.TextSize=13 b3.AutoButtonColor=false b3.Active=true b3.Parent=r
+    local c3=Instance.new("UICorner") c3.CornerRadius=UDim.new(0,8) c3.Parent=b3
+    local p1=Instance.new("Frame")
+    p1.BackgroundTransparency=1 p1.LayoutOrder=ra p1.Size=UDim2.new(1,-4,0,0)
+    p1.AutomaticSize=Enum.AutomaticSize.Y p1.Parent=ragePage
+    do local l1=Instance.new("UIListLayout") l1.Padding=UDim.new(0,6) l1.HorizontalAlignment=Enum.HorizontalAlignment.Center l1.SortOrder=Enum.SortOrder.LayoutOrder l1.Parent=p1 end
+    local p2=Instance.new("Frame")
+    p2.BackgroundTransparency=1 p2.LayoutOrder=ra+1 p2.Size=UDim2.new(1,-4,0,0)
+    p2.AutomaticSize=Enum.AutomaticSize.Y p2.Visible=false p2.Parent=ragePage
+    do local l2=Instance.new("UIListLayout") l2.Padding=UDim.new(0,6) l2.HorizontalAlignment=Enum.HorizontalAlignment.Center l2.SortOrder=Enum.SortOrder.LayoutOrder l2.Parent=p2 end
+    local p3=Instance.new("Frame")
+    p3.BackgroundTransparency=1 p3.LayoutOrder=ra+2 p3.Size=UDim2.new(1,-4,0,0)
+    p3.AutomaticSize=Enum.AutomaticSize.Y p3.Visible=false p3.Parent=ragePage
+    do local l3=Instance.new("UIListLayout") l3.Padding=UDim.new(0,6) l3.HorizontalAlignment=Enum.HorizontalAlignment.Center l3.SortOrder=Enum.SortOrder.LayoutOrder l3.Parent=p3 end
+    ra=ra+3
+    local function paintRage(i)
+        local bs={b1,b2,b3}
+        for k,b in ipairs(bs) do
+            if k==i then b.BackgroundColor3=THEME.Accent b.TextColor3=Color3.new(1,1,1)
+            else b.BackgroundColor3=THEME.Item b.TextColor3=THEME.TextDim end
+        end
+    end
+    local function showRage(i)
+        p1.Visible=(i==1) p2.Visible=(i==2) p3.Visible=(i==3)
+        paintRage(i)
+    end
+    b1.MouseButton1Click:Connect(function() showRage(1) end)
+    b2.MouseButton1Click:Connect(function() showRage(2) end)
+    b3.MouseButton1Click:Connect(function() showRage(3) end)
+    do local so=1
+    pageHeader(p1,so,"Ragebot") so=so+1
+    do local q=newRow(p1,so); so=so+1
+        createToggle(q,1,"Ragebot","Ragebot",false,function(v) Settings.Ragebot=v end,0.5,-3)
+        createToggle(q,2,"NoSnap","No Snap",true,function(v) Settings.NoSnap=v end,0.5,-3)
+    end
+    createSlider(p1,so,"RageFOV","Rage FOV",40,500,Settings.RageFOV,function(v) Settings.RageFOV=v end) so=so+1
+    createSlider(p1,so,"RageSmooth","Rage Smooth",1,10,Settings.RageSmooth,function(v) Settings.RageSmooth=v end) so=so+1
+    createSlider(p1,so,"RageReact","Reaction ms",0,500,Settings.RageReact,function(v) Settings.RageReact=v end) so=so+1
+    do
+        local info=Instance.new("TextLabel")
+        info.LayoutOrder=so so=so+1 info.Size=UDim2.new(1,-4,0,16)
+        info.BackgroundTransparency=1 info.Text="Forces Head + Closest."
+        info.Font=Enum.Font.Gotham info.TextSize=11 info.TextColor3=THEME.TextDim
+        info.TextWrapped=true info.Parent=p1
+    end
+    end
+    do local so=1
+    pageHeader(p2,so,"Triggerbot") so=so+1
+    createToggle(p2,so,"TrigEnabled","Triggerbot",false,function(v) Settings.TrigEnabled=v Rage.trigAcq=0 end) so=so+1
+    createDropdown(p2,so,"TrigMode","Mode",{"Always","Hold Key"},Settings.TrigMode,function(v) Settings.TrigMode=v Rage.trigAcq=0 end) so=so+1
+    createDropdown(p2,so,"TrigTarget","Hit Part",{"Any","Head","HRP"},Settings.TrigTarget,function(v) Settings.TrigTarget=v Rage.trigAcq=0 end) so=so+1
+    do local q=newRow(p2,so); so=so+1
+        createToggle(q,1,"TrigTeamCheck","Team Check",true,function(v) Settings.TrigTeamCheck=v end,0.5,-3)
+        createToggle(q,2,"TrigNoKnock","No Knocked",true,function(v) Settings.TrigNoKnock=v end,0.5,-3)
+    end
+    createSlider(p2,so,"TrigDelay","Reaction Delay (ms)",0,500,Settings.TrigDelay,function(v) Settings.TrigDelay=v Rage.trigAcq=0 end) so=so+1
+    do
+        local info=Instance.new("TextLabel")
+        info.LayoutOrder=so so=so+1 info.Size=UDim2.new(1,-4,0,16)
+        info.BackgroundTransparency=1 info.Text="Fires when the crosshair is on a valid target."
+        info.Font=Enum.Font.Gotham info.TextSize=11 info.TextColor3=THEME.TextDim
+        info.TextWrapped=true info.Parent=p2
+    end
+    Rage.trigLbl=Instance.new("TextLabel")
+    Rage.trigLbl.LayoutOrder=so so=so+1 Rage.trigLbl.Size=UDim2.new(1,-4,0,16) Rage.trigLbl.BackgroundTransparency=1
+    Rage.trigLbl.Text="status: off" Rage.trigLbl.Font=Enum.Font.Gotham
+    Rage.trigLbl.TextSize=11 Rage.trigLbl.TextColor3=THEME.TextDim Rage.trigLbl.TextXAlignment=Enum.TextXAlignment.Left Rage.trigLbl.Parent=p2
+    end
+    do local so=1
+    pageHeader(p3,so,"Recoil Control") so=so+1
+    createToggle(p3,so,"Recoil","Recoil Control",false,function(v) Settings.Recoil=v end) so=so+1
+    createSlider(p3,so,"RecoilX","X Strength",0,100,Settings.RecoilX,function(v) Settings.RecoilX=v end) so=so+1
+    createSlider(p3,so,"RecoilY","Y Strength",0,100,Settings.RecoilY,function(v) Settings.RecoilY=v end) so=so+1
+    do
+        local info=Instance.new("TextLabel")
+        info.LayoutOrder=so so=so+1 info.Size=UDim2.new(1,-4,0,16)
+        info.BackgroundTransparency=1 info.Text="Works standalone while firing (hold LMB)."
+        info.Font=Enum.Font.Gotham info.TextSize=11 info.TextColor3=THEME.TextDim
+        info.TextWrapped=true info.Parent=p3
+    end
+    end
+    showRage(1)
 end
 end -- rage tab
 
@@ -1533,6 +1632,9 @@ function saveConfig()
         FOV=Settings.FOV, ShowFOV=Settings.ShowFOV, Smoothing=Settings.Smoothing,
         Target=Settings.Target, Priority=Settings.Priority, AimTeamCheck=Settings.AimTeamCheck,
         WallCheck=Settings.WallCheck, NoKnock=Settings.NoKnock, AFKProtect=Settings.AFKProtect,
+        TrigEnabled=Settings.TrigEnabled, TrigMode=Settings.TrigMode, TrigTarget=Settings.TrigTarget,
+        TrigTeamCheck=Settings.TrigTeamCheck, TrigNoKnock=Settings.TrigNoKnock,
+        TrigDelay=Settings.TrigDelay,
         Ragebot=Settings.Ragebot, RageFOV=Settings.RageFOV, RageSmooth=Settings.RageSmooth,
         RageReact=Settings.RageReact, Recoil=Settings.Recoil, RecoilX=Settings.RecoilX,
         RecoilY=Settings.RecoilY, NoSnap=Settings.NoSnap,
@@ -1564,6 +1666,7 @@ function loadConfig()
     for _, id in ipairs({"ESPEnabled","Boxes","Names","Distance","TeamCheck","MaxESP","OverlayY","Inventory","Tracers",
         "AimEnabled","AimMethod","AimMode","FOV","ShowFOV","Smoothing","Target","Priority",
         "AimTeamCheck","WallCheck","NoKnock","AFKProtect","MaxDistance",
+        "TrigEnabled","TrigMode","TrigTarget","TrigTeamCheck","TrigNoKnock","TrigDelay",
         "Ragebot","RageFOV","RageSmooth","RageReact","Recoil","RecoilX","RecoilY","NoSnap",
         "Chams","AimLock","Crosshair","HealthBar","Prediction","Keybinds","FPSCap","FPSOverlay",
         "WalkSpeed","JumpPower","InfJump","Fly","FlySpeed","Noclip","Fullbright","CamFOV","ClickTP"}) do
@@ -1966,6 +2069,71 @@ for _,p in ipairs(Players:GetPlayers()) do
         end))
     end
 end
+local function setTrigState(s, nowC)
+    if Rage.trigLbl and nowC - (Rage.trigT or 0) > 0.2 then
+        Rage.trigT = nowC
+        pcall(function() Rage.trigLbl.Text = "status: " .. s end)
+    end
+end
+local function doTrigger(cam, myHrp, nowC)
+    if ESP_ONLY or Unloaded then return end
+    if not Settings.TrigEnabled or not myHrp then
+        Rage.trigAcq=0 setTrigState("off", nowC) return
+    end
+    local typing=false
+    pcall(function() typing = UserInputService:GetFocusedTextBox() ~= nil end)
+    if typing then Rage.trigAcq=0 setTrigState("paused (typing)", nowC) return end
+    if Settings.TrigMode=="Hold Key" and not isAimHeld() then
+        Rage.trigAcq=0 setTrigState("hold key...", nowC) return
+    end
+    local mouse=nil
+    pcall(function() mouse=LocalPlayer:GetMouse() end)
+    local valid=false
+    if mouse and cam then
+        local ray=nil
+        pcall(function() ray=cam:ScreenPointToRay(mouse.X, mouse.Y) end)
+        if ray then
+            rayParams.FilterDescendantsInstances={LocalPlayer.Character, cam}
+            local res=nil
+            pcall(function() res=Workspace:Raycast(ray.Origin, ray.Direction*1000, rayParams) end)
+            if res and res.Instance then
+                local hitModel=res.Instance:FindFirstAncestorOfClass("Model")
+                local tp=hitModel and Players:GetPlayerFromCharacter(hitModel) or nil
+                if tp and tp~=LocalPlayer then
+                    local ch=tp.Character
+                    local hum=ch and ch:FindFirstChildOfClass("Humanoid")
+                    if ch and hum and hum.Health>0 then
+                        valid=true
+                        if valid and Settings.TrigTeamCheck and tp.Team and LocalPlayer.Team and tp.Team==LocalPlayer.Team then valid=false end
+                        if valid and Settings.TrigNoKnock and isDownCached(ch, hum) then valid=false end
+                        if valid and Settings.TrigTarget=="Head" and res.Instance.Name~="Head" then valid=false end
+                        if valid and Settings.TrigTarget=="HRP" and res.Instance.Name~="HumanoidRootPart" then valid=false end
+                        if valid then
+                            local hp=ch:FindFirstChild("HumanoidRootPart")
+                            if hp and (myHrp.Position-hp.Position).Magnitude > Settings.MaxDistance then valid=false end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if valid then
+        if Rage.trigAcq==0 then Rage.trigAcq=nowC setTrigState("locked", nowC) end
+        if nowC-Rage.trigAcq >= Settings.TrigDelay/1000 then
+            Rage.trigAcq=nowC
+            local mx,my=0,0
+            pcall(function() local m2=UserInputService:GetMouseLocation() mx,my=m2.X,m2.Y end)
+            local how=fireClick(mx,my)
+            if how then setTrigState("firing ("..how..")", nowC)
+            else
+                setTrigState("NO CLICK API", nowC)
+                if not Rage.warned then Rage.warned=true warn("[NOVA] triggerbot: no click method (mouse1click/VIM/tool)") end
+            end
+        end
+    else
+        Rage.trigAcq=0 setTrigState("scanning", nowC)
+    end
+end
 track(Players.PlayerAdded:Connect(function(p)
     refreshPlayers()
     track(p.CharacterAdded:Connect(function()
@@ -2093,6 +2261,7 @@ renderConn=track(RunService.RenderStepped:Connect(function()
             end
         end)
     end
+    if doOverlay then doTrigger(cam, myHrp, nowC) end
     local wantAim=false
     if not ESP_ONLY and Settings.AimEnabled and not Unloaded then
         if Settings.AimMode=="Toggle" then wantAim=aimingOn
