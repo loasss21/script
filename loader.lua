@@ -44,7 +44,7 @@ local function detectName()
     return "Universal"
 end
 
-local statusLbl, barFill, loadGui, launchRow
+local statusLbl, barFill, loadGui, keyRow, keyBox, keyMsg, keyGoBtn, keyTries
 if parentGui then
     loadGui = Instance.new("ScreenGui")
     loadGui.Name = "NovaLoader"
@@ -54,7 +54,7 @@ if parentGui then
     local frame = Instance.new("Frame")
     frame.AnchorPoint = Vector2.new(0.5,0.5)
     frame.Position = UDim2.new(0.5,0,0.5,0)
-    frame.Size = UDim2.new(0,300,0,168)
+    frame.Size = UDim2.new(0,300,0,216)
     frame.BackgroundColor3 = THEME_BG
     frame.BorderSizePixel = 0
     frame.Active = true
@@ -68,24 +68,36 @@ if parentGui then
     title.TextSize = 15 title.TextColor3 = Color3.new(1,1,1) title.Parent = frame
     local subLbl = Instance.new("TextLabel")
     subLbl.Size = UDim2.new(1,0,0,18) subLbl.Position = UDim2.new(0,0,0,36) subLbl.BackgroundTransparency = 1
-    subLbl.Text = detectName() .. "  •  FULL" subLbl.Font = Enum.Font.GothamBold
-    subLbl.TextSize = 13 subLbl.TextColor3 = THEME_ACCENT subLbl.Parent = frame
-    launchRow = Instance.new("Frame")
-    launchRow.Size = UDim2.new(1,-20,0,32) launchRow.Position = UDim2.new(0,10,0,58)
-    launchRow.BackgroundTransparency = 1 launchRow.Parent = frame
-    local btnLaunch = Instance.new("TextButton")
-    btnLaunch.Size = UDim2.new(1,0,1,0) btnLaunch.Text = "LAUNCH"
-    btnLaunch.Font = Enum.Font.GothamBold btnLaunch.TextSize = 14
-    btnLaunch.BackgroundColor3 = THEME_ACCENT btnLaunch.TextColor3 = Color3.new(1,1,1)
-    btnLaunch.AutoButtonColor = false btnLaunch.Active = true btnLaunch.Parent = launchRow
-    local c1 = Instance.new("UICorner") c1.CornerRadius = UDim.new(0,8) c1.Parent = btnLaunch
+    subLbl.Text = detectName() .. "  •  key required" subLbl.Font = Enum.Font.GothamBold
+    subLbl.TextSize = 12 subLbl.TextColor3 = THEME_ACCENT subLbl.Parent = frame
+    keyRow = Instance.new("Frame")
+    keyRow.Size = UDim2.new(1,-20,0,86) keyRow.Position = UDim2.new(0,10,0,58)
+    keyRow.BackgroundTransparency = 1 keyRow.Parent = frame
+    keyBox = Instance.new("TextBox")
+    keyBox.Size = UDim2.new(1,0,0,34) keyBox.Position = UDim2.new(0,0,0,0)
+    keyBox.BackgroundColor3 = THEME_ITEM keyBox.Text = ""
+    keyBox.PlaceholderText = "enter key"
+    keyBox.Font = Enum.Font.Gotham keyBox.TextSize = 14 keyBox.TextColor3 = Color3.new(1,1,1)
+    keyBox.ClearTextOnFocus = false keyBox.Parent = keyRow
+    local kbc = Instance.new("UICorner") kbc.CornerRadius = UDim.new(0,8) kbc.Parent = keyBox
+    keyGoBtn = Instance.new("TextButton")
+    keyGoBtn.Size = UDim2.new(1,0,0,30) keyGoBtn.Position = UDim2.new(0,0,0,40)
+    keyGoBtn.BackgroundColor3 = THEME_ACCENT keyGoBtn.Text = "Unlock"
+    keyGoBtn.Font = Enum.Font.GothamBold keyGoBtn.TextSize = 13
+    keyGoBtn.TextColor3 = Color3.new(1,1,1)
+    keyGoBtn.AutoButtonColor = false keyGoBtn.Active = true keyGoBtn.Parent = keyRow
+    local gbc = Instance.new("UICorner") gbc.CornerRadius = UDim.new(0,8) gbc.Parent = keyGoBtn
+    keyMsg = Instance.new("TextLabel")
+    keyMsg.Size = UDim2.new(1,0,0,16) keyMsg.Position = UDim2.new(0,0,0,72)
+    keyMsg.BackgroundTransparency = 1 keyMsg.Text = "" keyMsg.Font = Enum.Font.Gotham
+    keyMsg.TextSize = 11 keyMsg.TextColor3 = Color3.fromRGB(255,120,120) keyMsg.Parent = keyRow
     statusLbl = Instance.new("TextLabel")
-    statusLbl.Size = UDim2.new(1,-20,0,20) statusLbl.Position = UDim2.new(0,10,0,96)
-    statusLbl.BackgroundTransparency = 1 statusLbl.Text = "ready..."
+    statusLbl.Size = UDim2.new(1,-20,0,20) statusLbl.Position = UDim2.new(0,10,0,150)
+    statusLbl.BackgroundTransparency = 1 statusLbl.Text = "waiting for key..."
     statusLbl.Font = Enum.Font.Gotham statusLbl.TextSize = 12
     statusLbl.TextColor3 = THEME_DIM statusLbl.Parent = frame
     local barBG = Instance.new("Frame")
-    barBG.Size = UDim2.new(1,-20,0,12) barBG.Position = UDim2.new(0,10,0,122)
+    barBG.Size = UDim2.new(1,-20,0,12) barBG.Position = UDim2.new(0,10,0,176)
     barBG.BackgroundColor3 = THEME_PANEL barBG.BorderSizePixel = 0 barBG.Parent = frame
     local bbgc = Instance.new("UICorner") bbgc.CornerRadius = UDim.new(0,6) bbgc.Parent = barBG
     barFill = Instance.new("Frame")
@@ -93,14 +105,15 @@ if parentGui then
     barFill.BorderSizePixel = 0 barFill.Parent = barBG
     local bfc = Instance.new("UICorner") bfc.CornerRadius = UDim.new(0,6) bfc.Parent = barFill
     local foot = Instance.new("TextLabel")
-    foot.Size = UDim2.new(1,-20,0,20) foot.Position = UDim2.new(0,10,0,138)
-    foot.BackgroundTransparency = 1 foot.Text = "FULL = everything unlocked."
+    foot.Size = UDim2.new(1,-20,0,20) foot.Position = UDim2.new(0,10,0,192)
+    foot.BackgroundTransparency = 1 foot.Text = "enter the key to continue."
     foot.Font = Enum.Font.Gotham foot.TextSize = 11
     foot.TextColor3 = THEME_DIM foot.TextWrapped = true foot.Parent = frame
-    btnLaunch.MouseButton1Click:Connect(function()
-        setMode("full")
-        pcall(function() launchRow.Visible = false end)
-        startRun("full")
+    keyGoBtn.MouseButton1Click:Connect(function()
+        tryKey()
+    end)
+    keyBox.FocusLost:Connect(function(enter)
+        if enter then pcall(tryKey) end
     end)
 end
 
@@ -162,6 +175,36 @@ function setMode(m)
         if type(g) == "table" then g.NOVA_MODE = m end
     end)
     pcall(function() _G.NOVA_MODE = m end)
+end
+
+-- key gate: hardcoded key for now, gates the auto-load
+local LOADER_KEY = "1234"
+keyTries = 0
+function tryKey()
+    if started then return end
+    local k = (keyBox and keyBox.Text or ""):gsub("%s+", "")
+    if k == LOADER_KEY then
+        keyTries = 0
+        pcall(function() keyMsg.Text = "" end)
+        -- hand the validated key to the game scripts so they skip their own gate
+        setMode("full")
+        pcall(function()
+            local g = getgenv and getgenv()
+            if type(g) == "table" then g.NOVA_KEY = LOADER_KEY end
+        end)
+        pcall(function() _G.NOVA_KEY = LOADER_KEY end)
+        startRun("full")
+    else
+        keyTries = keyTries + 1
+        pcall(function()
+            keyMsg.Text = "wrong key (" .. keyTries .. "/5)"
+            keyBox.Text = ""
+        end)
+        if keyTries >= 5 then
+            pcall(function() keyMsg.Text = "too many bad keys — rejoin and retry" end)
+            started = true -- stop trying; loader stays open
+        end
+    end
 end
 
 function startRun(mode)

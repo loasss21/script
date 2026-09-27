@@ -17,9 +17,9 @@ local LocalPlayer = Players.LocalPlayer
 
 print("[NOVA] v8.0 boot (generic)")
 
--- KEY SYSTEM: set true + put your keys in VALID_KEYS to lock the script
-local KeySystemEnabled = false
-local VALID_KEYS = { ["CHANGE-ME"] = true }
+-- KEY SYSTEM: key gates the menu (loader hands it via getgenv when present)
+local KeySystemEnabled = true
+local VALID_KEYS = { ["1234"] = true }
 local KEY_FILE = "nova_key.txt"
 local MAX_KEY_TRIES = 5
 
@@ -128,6 +128,10 @@ local function runStale()
     return genv ~= nil and tonumber(genv.NOVA_RUN) ~= myRun
 end
 local function gateOpen()
+    -- loader already validated the key
+    local g = getgenv and getgenv()
+    if type(g)=="table" and g.NOVA_KEY=="1234" then return true end
+    if _G.NOVA_KEY=="1234" then return true end
     return (not KeySystemEnabled) or keyPassed
 end
 
