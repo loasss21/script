@@ -342,6 +342,7 @@ if KeySystemEnabled and not keyPassed then
             pcall(function() keyFrame:Destroy() end)
             keyFrame=nil
             notify("NOVA", "key accepted")
+            if LoadingDone then setMenu(true) end
         else
             keyTries=keyTries+1
             keyMsg.Text="Wrong key ("..keyTries.."/"..MAX_KEY_TRIES..")"
@@ -1845,39 +1846,34 @@ local function Unload()
 end
 unloadBtn.MouseButton1Click:Connect(Unload)
 
--- BOOT
+-- BOOT (fault-tolerant: menu shows on timer regardless of key gate;
+-- the key gate only hides the menu UI, it never blocks loading)
 local function finishLoading()
-    if Unloaded or LoadingDone or not gateOpen() then return end
+    if Unloaded or LoadingDone then return end
     LoadingDone=true
     print("[NOVA] v8.0 loaded ("..FILE_TAG.." / "..GAME_VERSION..")")
     pcall(function() loading:Destroy() end)
-    setMenu(true)
+    if gateOpen() then setMenu(true) end
     refreshPlayers()
     for _,p in ipairs(cachedPlayers) do
         if p~=LocalPlayer and p.Character then task.spawn(createESP,p) end
     end
 end
 
-local LOAD_TIME = 3.8
-task.spawn(function()
-    while not gateOpen() and not Unloaded and not runStale() do task.wait(0.1) end
-    if Unloaded or runStale() then return end
-    pcall(function() loading.Visible=true end)
-    local t0=os.clock()
-    while not Unloaded and not LoadingDone and loading.Parent and not runStale() do
-        pcall(function() spinRot.Rotation=(spinRot.Rotation+12)%360 end)
-        local n=math.clamp(math.floor((os.clock()-t0)/LOAD_TIME*100),0,100)
-        pcall(function() barFill.Size=UDim2.new(n/100,0,1,0) pct.Text=n.."%" end)
-        if n>=100 then break end
-        task.wait(0.03)
+task.delay(0.6, function()
+    if not Unloaded and not LoadingDone and not runStale() then
+        finishLoading()
     end
-    task.wait(0.25)
-    finishLoading()
 end)
 
-task.delay(8, function()
-    if not Unloaded and not LoadingDone and gateOpen() and not runStale() then
-        warn("[NOVA] fallback force-show")
-        finishLoading()
+-- repeating fallback: force-show even if the timer/thread got stuck
+task.spawn(function()
+    local n=0
+    while not Unloaded and not LoadingDone and not runStale() and n<15 do
+        task.wait(1)
+        n=n+1
+        if not LoadingDone and loading.Parent then
+            pcall(finishLoading)
+        end
     end
 end)
